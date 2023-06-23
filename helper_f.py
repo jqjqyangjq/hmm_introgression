@@ -121,24 +121,48 @@ def load_observations(gll_file, window_size):  # return g0 g1
             gl["g_0"][chrom][window].append(g_0)
             gl["g_1"][chrom][window].append(g_1)
     obs_chrs = []
+    obs_count = []
     for chrom in list(gl["g_0"].keys()):
         gl_0_ = []
         gl_1_ = []
+        obs_count_ = []
         for window in list(gl["g_0"][chrom].keys()):
             gl_0_.append(np.array(gl["g_0"][chrom][window]))
+            obs_count_.append(len(gl["g_0"][chrom][window]))
             gl_1_.append(np.array(gl["g_1"][chrom][window]))
         obs_chrs.append([gl_0_, gl_1_])
-    return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) )
+        obs_count.append(obs_count_)
+    return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
     '''
     return:
-        full gll, chrom, window index for each chrom
+        full gll[chrom][window], chrom, window index for each chrom, and the actual count of snps in each window
     '''
-    
-def mut_rates(mut_file, window, window_size):
+
+def get_mut_rates(mut_full, window_size, windows, obs_count, chr):
     '''
-    return:
-        mutation rate for each indexed window given the input.
-        
+    window: window index
+    a chromsome
+    e.g. 0 1000000 1.5
+         1000000 2000000 2.5
+
     '''
-    pass
-    
+    mut = []
+    mut_full = mut_full[mut_full['chrom'] == chr]
+    assert len(mut_full)!=0, f"mutation rate missing for chromsome {chr}"
+    current_window = 0
+    inter = 0   #interval of mut rates
+    while current_window <= len(windows):
+        while inter < len(mut_full):  
+            '''
+            window 100
+            100 * 100 - 101 * 1000
+            '''
+            ''' go to current mut interval'''
+            if ((mut_full.iloc[inter]['start'] <= (windows[current_window] * window_size)) and (mut_full.iloc[inter]['end'] >= (windows[current_window] + 1) * window_size)):
+                mut.extend([mut_full.iloc[inter]['mut_rate']] * obs_count[current_window])
+                current_window += 1
+                break
+            inter += 1
+        if ((inter >= len(mut_full)) or (current_window >= len(windows))):
+            break
+    return mut

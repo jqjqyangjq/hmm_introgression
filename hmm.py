@@ -6,7 +6,7 @@ import json
 from math import exp, ceil
 
 
-from helper_f import load_observations
+from helper_f import load_observations, get_mut_rates
 
 @njit
 def snp2bin_scale(e_out, e_in, ix, scale):    
@@ -140,7 +140,7 @@ def logoutput(pars, loglikelihood, iteration, log_file):
             sep="\t",
             file = f
         )
-
+        
 def write_post_to_file(Z, chr_index, w_index, outfile):
     Z_df = pd.DataFrame()
     for i in range(len(Z)):
@@ -155,7 +155,7 @@ def write_post_to_file(Z, chr_index, w_index, outfile):
     Z_df.to_csv(outfile, index=False)
     
     
-def linearize_obs(raw_obs, w, m_rates = None):   # index all the snps [0,0,0..,1,1,...]
+def linearize_obs(raw_obs, w):   # index all the snps [0,0,0..,1,1,...]
     g = (w_ind for i, (s,w_ind) in enumerate(zip((raw_obs[0]), w)) for j in s)
     SNP2BIN = np.fromiter(g, int)
     GLL = np.vstack((np.concatenate(raw_obs[0]), np.concatenate(raw_obs[1]))).T
@@ -171,12 +171,16 @@ def update_snp_prob(SNP, GLL, p, m_rates):
 
 def update_geno_emissions(SNP, p, m_rates):
     """calculate P(G | Z)
-    p_0derived = e^(-lambda) with lambda = T / tu * mu
+    at least one derived allele at the pisition
+    snp1 = 1 - p_0derived = 1 - e^(-lambda) with lambda = T / tu (* mu), approxiamte with snp1 = T / tu (* mu) 
+
+    
+    
     broadcast for all sites
     """
     
-    SNP[:, 0, 1] = p[0] #* m_rates
-    SNP[:, 1, 1] = p[1] #* m_rates
+    SNP[:, 0, 1] = np.array(m_rates) * p[0]
+    SNP[:, 1, 1] = np.array(m_rates) * p[1]
     SNP[:, 0, 0] = (1 - SNP[:, 0, 1])
     SNP[:, 1, 0] = (1 - SNP[:, 1, 1])
     
@@ -220,7 +224,8 @@ def update_post_geno(PG, SNP, Z, SNP2BIN):
 
     return PG
 
-def TrainModel(raw_obs, chr_index, w, pars, post_file, epsilon=1e-4, maxiterations=1000, log_file = None, m_rates = None):
+def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, window_size = 1000, 
+               epsilon=1e-4, maxiterations=1000, log_file = None, m_rates_file = None):
     '''
     raw_obs, [[obs_chr1], [obs_chr2], ...]
     chr [chr1, chr2, ...]
@@ -247,11 +252,16 @@ def TrainModel(raw_obs, chr_index, w, pars, post_file, epsilon=1e-4, maxiteratio
     fwd = []
     bwd = []
     scales = []
+    m_rates = []
+    if not m_rates_file is None:
+        m_rates_full = pd.read_csv(m_rates_file, sep = '\t', 
+                               header = None, names = ["chrom", "start", "end", "mut_rate"],
+                               dtype = {"chrom": str, "start": int, "end": int, "mut_rate": float})
     for chr in range(n_chr):
         n_windows[chr] = w[chr][-1] - w[chr][0] + 1
         GLL_, SNP2BIN_ = linearize_obs(raw_obs[chr], w[chr])
         w_start = w[chr][0]
-        w_index_ = np.arange(w_start, w[chr][-1] + 1)
+        w_index_ = np.arange(w_start, w[chr][-1] + 1)    # including missing windows in between
         SNP2BIN_ -= w_start
         n_snp = len(GLL_)
         n_windows_ = round(n_windows[chr])
@@ -266,8 +276,12 @@ def TrainModel(raw_obs, chr_index, w, pars, post_file, epsilon=1e-4, maxiteratio
         SNP.append(SNP_)
         PG_ = np.zeros((n_snp, n_states, n_gt))
         PG.append(PG_)
-        if m_rates is None:
-            m_rates = np.ones(n_windows_)
+        if m_rates_file is None:
+            m_rates_ = np.ones(n_snp)
+        else:
+            m_rates_ = get_mut_rates(m_rates_full, window_size, w[chr], obs_count[chr], chr_index[chr])
+        m_rates.append(m_rates_)
+        assert len(m_rates_) == n_snp, f"missing part of mutation rates for obs in {chr}-th chromsome"
     # the data and an indexing array
     # adapted from admixfrog
     # create arrays for posterior, emissions
@@ -281,7 +295,7 @@ def TrainModel(raw_obs, chr_index, w, pars, post_file, epsilon=1e-4, maxiteratio
         for chr in range(n_chr):
             n_windows_ = round(n_windows[chr])
             S = np.zeros(n_windows_)
-            update_emissions_scale(E[chr], SNP[chr], GLL[chr], p, SNP2BIN[chr], S, m_rates)
+            update_emissions_scale(E[chr], SNP[chr], GLL[chr], p, SNP2BIN[chr], S, m_rates[chr])
             '''
             update E for per window(product of all sites)
             update S, scaling factor for each window
@@ -294,7 +308,7 @@ def TrainModel(raw_obs, chr_index, w, pars, post_file, epsilon=1e-4, maxiteratio
             update_post_geno(PG[chr], SNP[chr], Z[chr], SNP2BIN[chr])
             '''
             P(G_lr = g, Z_l | O', theta)  see my(Jiaqi) letax note.
-            '''    
+            '''
             assert np.allclose(np.sum(PG[chr], (1, 2)), 1)
             # PG = P(Z|O) P(O, G | Z) / sum_g P(O, G=g | Z) for all sites
             top += np.sum(PG[chr][:,:,1], axis = 0)

@@ -1,4 +1,10 @@
 # hmm_introgression
-an extended version of hmmix
+A test version
+This is to extend the original himmix model to low-coverage and damaged genomic data.
+The emission process has been totally re-written.
+Assume a pre-calculated mutrate file across the genome, other wise assume constant mutation rates
+(testing by simulation)
 
-This is to extend the original himmix model to low-coverage and damaged genomic data, and part of it is from admixfrog
+Assume pre-calculated gll input file, taking damamge pattern into account.
+(testing for uncertainty in gll calculating)
+
