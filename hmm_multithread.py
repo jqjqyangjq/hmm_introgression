@@ -260,13 +260,7 @@ def update_post_geno(PG, SNP, Z, SNP2BIN):
     return PG
 
 def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, window_size = 1000, 
-               epsilon=5e-4, maxiterations=1000, log_file = None, m_rates_file = None):
-
-
-    '''
-    do not privide m_rates_file, so default mutation rate which is constant will be used. at least when binning by physical distance
-    '''
-
+               epsilon=1e-4, maxiterations=1000, log_file = None, m_rates_file = None):
     '''
     raw_obs, [[obs_chr1], [obs_chr2], ...]
     chr [chr1, chr2, ...]
