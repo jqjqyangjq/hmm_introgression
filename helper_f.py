@@ -140,7 +140,7 @@ def load_observations(gll_file, window_size):  # return g0 g1
         full gll[chrom][window], chrom, window index for each chrom, and the actual count of snps in each window
     '''
 """
-def load_observations(gll_file, window_size=1000):  # return g0 g1
+def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_dep = None, minimum_dep = None):  # return g0 g1
     
     
     # free space for each chrom.
@@ -176,20 +176,40 @@ def load_observations(gll_file, window_size=1000):  # return g0 g1
     if len_ne == 6:
         print(f"loading real data from {gll_file}")
         with gzip.open(gll_file, "rt") as data:
-            for line in data:
-                (
-                    chrom,
-                    pos,
-                    _,
-                    _,
-                    g0,
-                    g1
-                ) = line.strip().split()
-                g_0 = float(g0)
-                g_1 = float(g1)
-                window = ceil(int(pos) / window_size) - 1
-                gl["g_0"][chrom][window].append(g_0)
-                gl["g_1"][chrom][window].append(g_1)
+            if filter_depth is False:
+                for line in data:
+                    (
+                        chrom,
+                        pos,
+                        _,
+                        _,
+                        g0,
+                        g1
+                    ) = line.strip().split()
+                    g_0 = float(g0)
+                    g_1 = float(g1)
+                    window = ceil(int(pos) / window_size) - 1
+                    gl["g_0"][chrom][window].append(g_0)
+                    gl["g_1"][chrom][window].append(g_1)
+            else:
+                assert not (maximum is None), "maximum_dep is not None"
+                assert not (minimum_dep is None), "minimum_dep is not None"
+                print(f"remove positions with depth > {maximum_dep} or depth <{minimum_dep}")
+                for line in data:
+                    (
+                        chrom,
+                        pos,
+                        _,
+                        dep,
+                        g0,
+                        g1
+                    ) = line.strip().split()
+                    if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
+                        g_0 = float(g0)
+                        g_1 = float(g1)
+                        window = ceil(int(pos) / window_size) - 1
+                        gl["g_0"][chrom][window].append(g_0)
+                        gl["g_1"][chrom][window].append(g_1)
     obs_chrs = []
     obs_count = []
     for chrom in list(gl["g_0"].keys()):
