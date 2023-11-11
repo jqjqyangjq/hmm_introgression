@@ -259,10 +259,10 @@ def update_post_geno(PG, SNP, Z, SNP2BIN):
 
     return PG
 
-def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, window_size = 1000, 
+def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, not_est_trans, window_size = 1000, 
                epsilon=5e-4, maxiterations=1000, log_file = None, m_rates_file = None):
 
-
+    print(f"Fix transition parameter(in case low coverage): {not_est_trans}")
     '''
     do not privide m_rates_file, so default mutation rate which is constant will be used. at least when binning by physical distance
     '''
@@ -357,18 +357,21 @@ def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, window_size = 
             bot[0] += np.sum(PG[chr][:,0,0]) + np.sum(PG[chr][:,0,1] * m_rates[chr])
             bot[1] += np.sum(PG[chr][:,1,0]) + np.sum(PG[chr][:,1,1] * m_rates[chr])
             #bot += np.sum(PG[chr],(0,2))
-            for s1 in range(n_states):
-                for s2 in range(n_states):
-                    new_trans_[chr][s1, s2] = np.sum(
-                        fwd[:-1, s1] * pars.transitions[s1, s2] * E[chr][1:, s2] * bwd[1:, s2] / scales[1:]
-                    )
+            if not not_est_trans:
+                for s1 in range(n_states):
+                    for s2 in range(n_states):
+                        new_trans_[chr][s1, s2] = np.sum(
+                            fwd[:-1, s1] * pars.transitions[s1, s2] * E[chr][1:, s2] * bwd[1:, s2] / scales[1:]
+                        )
             new_ll += np.sum(np.log(scales)) -  np.sum(S)
             normalize.append(np.sum(Z[chr], axis = 0))      # sum over posterior across chrs
         
         new_p = top / bot
-        new_trans = np.sum(new_trans_, 0)
-        new_trans /= new_trans.sum(axis=1)[:, np.newaxis] #Ben/Laurits 
-        
+        if not not_est_trans:
+            new_trans = np.sum(new_trans_, 0)
+            new_trans /= new_trans.sum(axis=1)[:, np.newaxis] #Ben/Laurits 
+        else:
+            new_trans = pars.transitions        
 
 
 

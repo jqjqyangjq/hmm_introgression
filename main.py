@@ -29,11 +29,13 @@ def main():
     train_subparser.add_argument("-log_file", metavar='',
                                  help="output log info of baum-welch", default = "EM_iterration.log")
     train_subparser.add_argument("-iteration", metavar='', help = "max iteration for EM", type = int, default = 1000)
-    train_subparser.add_argument("-filter_depth", metavar='', help = "whetther set a uniform filter on coverage", type = bool, default = False)
+    train_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage",  default = False)
     train_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = None)
     train_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = None)
+    train_subparser.add_argument("-not_est_transition",  action='store_true', help = "estimate transition parameter or not", default= False)
     
     decode_subparser = subparser.add_parser('decode', help='Decode posterior from params trained')
+    decode_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage", default = False)
     decode_subparser.add_argument("-gll_file", metavar='', 
                                  help="[required] gll file taken deam into account", type=str, required = True)
     decode_subparser.add_argument("-mut_file", metavar='',
@@ -45,7 +47,8 @@ def main():
     decode_subparser.add_argument("-posterior", metavar='',
                                  help="output of posterior from fwd-bwd", default = "Posterior.txt")
     decode_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = None)
-                                 
+    decode_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = None)
+                                
     call_subparser = subparser.add_parser('call', help='call fragments based on posterior')
     call_subparser.add_argument("-posterior", metavar='',
                                  help="output of posterior from fwd-bwd")
@@ -59,9 +62,11 @@ def main():
             parser.print_help()
             return
         hmm_parameters = read_HMM_parameters_from_file(args.param)
+        print(f"filter depth: {args.filter_depth}")
+        print(f"fixed transition parameters: {args.not_est_transition}")
         print(args.param)
         #obs, _, _, _, mutrates, weights = Load_observations_weights_mutrates(args.obs, args.weights, args.mutrates, args.window_size, args.haploid)
-        observation, chrs, windows, obs_count = load_observations(args.gll_file, args.window_size, filter_depth, maximum_dep, minimum_dep)
+        observation, chrs, windows, obs_count = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep)
         print('-' * 40)
         print(hmm_parameters)
         print('> Output is',args.out) 
@@ -77,7 +82,7 @@ def main():
                                  pars = hmm_parameters,
                                  m_rates_file = args.mut_file,
                                  maxiterations=args.iteration,
-                                 maximum_dep = args.maximum_dep)
+                                 not_est_trans = args.not_est_transition)
         write_HMM_to_file(hmm_parameters, args.out)
     if args.mode == "decode":
         print("decoding")
@@ -85,7 +90,7 @@ def main():
             parser.print_help()
             return
         hmm_parameters = read_HMM_parameters_from_file(args.param)
-        observation, chrs, windows, obs_count = load_observations(args.gll_file, args.window_size, filter_depth, maximum_dep, minimum_dep)
+        observation, chrs, windows, obs_count = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep)
         print('-' * 40)
         print(hmm_parameters)
         print('> Window size is',args.window_size, 'bp') 
@@ -97,8 +102,7 @@ def main():
                         window_size = args.window_size,
                         post_file= args.posterior,
                         pars = hmm_parameters,
-                        m_rates_file = args.mut_file,
-                        maximum_dep = args.maximum_dep)
+                        m_rates_file = args.mut_file)
     if args.mode == "call":
         print("calling fragments using posterior")
         if not hasattr(args, 'posterior'):

@@ -192,9 +192,9 @@ def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_
                     gl["g_0"][chrom][window].append(g_0)
                     gl["g_1"][chrom][window].append(g_1)
             else:
-                assert not (maximum is None), "maximum_dep is not None"
+                assert not (maximum_dep is None), "maximum_dep is not None"
                 assert not (minimum_dep is None), "minimum_dep is not None"
-                print(f"remove positions with depth > {maximum_dep} or depth <{minimum_dep}")
+                print(f"keep positions with depth <= {maximum_dep} or depth >= {minimum_dep}")
                 for line in data:
                     (
                         chrom,
