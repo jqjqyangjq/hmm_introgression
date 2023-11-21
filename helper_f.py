@@ -6,140 +6,116 @@ import json
 from math import exp, ceil
 import os 
 import gzip
-"""
-def load_observations(gll_file, window_size):  # return g0 g1
-    
-    
-    # free space for each chrom.
-    # cap on depth
-    gl = defaultdict(lambda:defaultdict(lambda: defaultdict(list)))
-    with open(gll_file, "r") as data:
+def load_fasta(fasta_file):
+    '''
+    Read a fasta file with a single chromosome in and return the sequence as a string
+    '''
+    fasta_sequence = ''
+    with open(fasta_file) as data:
         for line in data:
-            (
-                chrom,
-                pos,
-                Anc,
-                _,
-                _,
-                _,
-                _,
-                dep,
-                G1,
-                G2,
-                G3,
-                G4,
-                G5,
-                G6,
-                G7,
-                G8,
-                G9,
-                G10,
-            ) = line.strip().split()
-            '''
-            A,  C,G,T,  aa,ac,ag,at,cc,cg,ct,gg,gt,tt
-            For now, get max of G1
-            '''
-            '''
-            get anc base from ref
-            '''            
-            if Anc == "A":
-                g_0 = float(G1)
-                g_1 = max(
-                    np.array(
-                        [
-                            float(G2),
-                            float(G3),
-                            float(G4),
-                            float(G5),
-                            float(G6),
-                            float(G7),
-                            float(G8),
-                            float(G9),
-                            float(G10),
-                        ]
-                    )
-                )
-                if g_1 >= 1:
-                    g_1 = 1
-            elif Anc == "C":
-                g_0 = float(G5)
-                g_1 = max(
-                    np.array(
-                        [
-                            float(G1),
-                            float(G2),
-                            float(G3),
-                            float(G4),
-                            float(G6),
-                            float(G7),
-                            float(G8),
-                            float(G9),
-                            float(G10),
-                        ]
-                    )
-                )
-                if g_1 >= 1:
-                    g_1 = 1
-            elif Anc == "G":
-                g_0 = float(G8)
-                g_1 = max(
-                    np.array(
-                        [
-                            float(G1),
-                            float(G2),
-                            float(G3),
-                            float(G4),
-                            float(G5),
-                            float(G6),
-                            float(G7),
-                            float(G9),
-                            float(G10),
-                        ]
-                    )
-                )
-                if g_1 >= 1:
-                    g_1 = 1
-            elif Anc == "T":
-                g_0 = float(G10)
-                g_1 = max(
-                    np.array(
-                        [
-                            float(G1),
-                            float(G2),
-                            float(G3),
-                            float(G4),
-                            float(G5),
-                            float(G6),
-                            float(G7),
-                            float(G8),
-                            float(G9),
-                        ]
-                    )
-                )
-                if g_1 >= 1:
-                    g_1 = 1
-            #window = int(pos) - int(pos) % 1000
-            window = ceil(int(pos) / window_size) - 1
-            gl["g_0"][chrom][window].append(g_0)
-            gl["g_1"][chrom][window].append(g_1)
-    obs_chrs = []
-    obs_count = []
-    for chrom in list(gl["g_0"].keys()):
-        gl_0_ = []
-        gl_1_ = []
-        obs_count_ = []
-        for window in list(gl["g_0"][chrom].keys()):
-            gl_0_.append(np.array(gl["g_0"][chrom][window]))
-            obs_count_.append(len(gl["g_0"][chrom][window]))
-            gl_1_.append(np.array(gl["g_1"][chrom][window]))
-        obs_chrs.append([gl_0_, gl_1_])
-        obs_count.append(obs_count_)
-    return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
-    '''
-    return:
-        full gll[chrom][window], chrom, window index for each chrom, and the actual count of snps in each window
-    '''
-"""
+            if not line.startswith('>'):
+                fasta_sequence += line.strip().upper()
+
+    return fasta_sequence
+
+def get_obs_gll(vcf, fa, out, mask = None):
+    s = f"zcat {vcf}"
+    if not mask is None:
+        s  = f"bcftools view -R {mask} {vcf}"
+    with open(out, 'w') as f:
+        fa = load_fasta(fa)
+        for line in os.popen(s):
+            if not line.startswith('#'):
+                GLs = defaultdict(lambda:0.0)
+                chr, pos, _, A, BCD, _, _, _, _, info = line.strip().split()
+                pos = int(pos)
+                anc = fa[pos-1]
+                if A in "ACGT":
+                    B, C, D = BCD.strip().split(',')
+                    _, DP, _, _, _, _, _, _, GL = info.strip().split(':')
+                    GL = np.array([float(x) for x in GL.strip().split(',')])
+                    GL = np.power(10, GL)
+                    GLs[f'{A}{A}'] = GL[0]
+                    GLs[f'{A}{B}'] = GL[1]
+                    GLs[f'{B}{B}'] = GL[2]
+                    GLs[f'{A}{C}'] = GL[3]
+                    GLs[f'{B}{C}'] = GL[4]
+                    GLs[f'{C}{C}'] = GL[5]
+                    GLs[f'{A}{D}'] = GL[6]
+                    GLs[f'{B}{D}'] = GL[7]
+                    GLs[f'{C}{D}'] = GL[8]
+                    GLs[f'{D}{D}'] = GL[9]
+                    if anc == "A":
+                        print(chr, pos, anc, DP, GLs['AA'], 
+                        np.max(
+                            [GLs['AC'], GLs['CA'], GLs['AG'], GLs['GA'], GLs['AT'], GLs['TA'], 
+                            GLs['CC'], 
+                            GLs['CG'], GLs['GC'], GLs['CT'], GLs['TC'], 
+                            GLs['GG'], 
+                            GLs['GT'], GLs['TG'], 
+                            GLs['TT']]), 
+                            file = f, sep = '\t')
+                    elif anc == "C":
+                        print(chr, pos, anc, DP, GLs['CC'], 
+                        np.max(
+                            [GLs['AA'], 
+                            GLs['AC'], GLs['CA'], GLs['AG'], GLs['GA'], GLs['AT'], GLs['TA'], 
+                            GLs['CG'], GLs['GC'], GLs['CT'], GLs['TC'], 
+                            GLs['GG'], 
+                            GLs['GT'], GLs['TG'], 
+                            GLs['TT']]), 
+                            file = f, sep = '\t')
+                    elif anc == "G":
+                        print(chr, pos, anc, DP, GLs['GG'], 
+                        np.max(
+                            [GLs['AA'], 
+                            GLs['AC'], GLs['CA'], GLs['AG'], GLs['GA'], GLs['AT'], GLs['TA'], 
+                            GLs['CC'], 
+                            GLs['CG'], GLs['GC'], GLs['CT'], GLs['TC'], 
+                            GLs['GT'], GLs['TG'], 
+                            GLs['TT']]), 
+                            file = f, sep = '\t')
+                    elif anc == "T":
+                        print(chr, pos, anc, DP, GLs['TT'], 
+                        np.max(
+                            [GLs['AA'], 
+                            GLs['AC'], GLs['CA'], GLs['AG'], GLs['GA'], GLs['AT'], GLs['TA'], 
+                            GLs['CC'], 
+                            GLs['CG'], GLs['GC'], GLs['CT'], GLs['TC'], 
+                            GLs['GG'], 
+                            GLs['GT'], GLs['TG']]), 
+                            file = f, sep = '\t')
+
+def get_obs_gt(vcf, fa, out, mask = None):
+    s = f"zcat {vcf}"
+    if not mask is None:
+        s = f"bcftools view -R {mask} {vcf}"
+    with open(out, 'w') as f:
+        fa = load_fasta(fa)
+        for line in os.popen(s):
+            if not line.startswith("#"):
+                chr, pos, _, A, BCD, _, _, _, _, info = line.strip().split()    # A, ref
+                if A != "ACGT" :
+                    pos = int(pos)
+                    anc = fa[pos-1]
+                    if anc in "ACGT":
+                        gt, dep = info.split(':')[0:2]
+                        if gt == "0/0":    #   homozygous reference, BCD = '.'
+                            if anc == A:
+                                print(chr, pos, anc, dep, 0, A+A, sep = '\t', file = f)
+                            else:
+                                print(chr, pos, anc, dep, 2, BCD+BCD, sep = '\t', file = f)
+                        elif gt == "1/1":   # homozygous alternative.    anc must be alt
+                            B = BCD.split(',')[0]
+                            if anc == B:
+                                print(chr, pos, anc, dep, 0, BCD+BCD, sep = '\t', file = f)
+                            else:
+                                print(chr, pos, anc, dep, 2, BCD+BCD, sep = '\t', file = f)
+                        elif gt == "0/1":
+                            print(chr, pos, anc, dep, 1, A+BCD, sep = '\t',  file = f)
+
+
+
 def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_dep = None, minimum_dep = None):  # return g0 g1
     
     
@@ -266,6 +242,81 @@ def load_observations_rec(gll_file, window_size = 1000):  # return g0 g1
     return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
 """
 
+def load_observations_gt_ancient(gt_file, mask_file, window_size, max_variants=20, data_type = "ancient" ):  # return number of variants
+    chr = []
+    chr_index = []  #chrs
+    windows = []
+    weights = []  # weights    [1,0,1,0,2,...] from the first bin with data to last bin with data
+    obs = []    # [0,0,0,1,0,0...][0,1,1,0,...] from the first bin with data to last bin with data
+    call_index = []    #[0,1,3,5,...]   bins with data
+    # assuming full length 100M
+    window_all = []
+
+    call = get_weights(mask_file, window_size)
+
+    for chr in list(call.keys()):
+        first_w = list(call[chr].keys())[0]  # the first window callable
+        last_w = list(call[chr].keys())[-1]  # the last window callable
+        
+        weights_ = np.zeros(last_w - first_w + 1)
+        call_index_ = []
+        
+        for i in list(call[chr].keys()):   # loop through all windows with data
+            i = int(i)
+            call_index_.append(i - first_w)
+        for w in range(first_w, last_w+1):
+            weights_[w-first_w] = call[chr][w]
+        weights.append(weights_)              #
+        
+        call_index.append(call_index_)    # [0,1,3,5,...]   bins with data, count from the first bin with data.
+    snp = defaultdict(lambda:defaultdict(int))
+    if gt_file.endswith(".gz"):
+        if data_type == "ancient":
+            sss = f"zcat {gt_file} | awk '($5==1)'"
+            for line in os.popen(sss):
+                #chr, pos = line.strip().split()
+                chr, pos = line.strip().split()[0:2]
+                window = ceil(int(pos) / window_size) - 1
+                snp[chr][window]+=1
+        else:
+            with gzip.open(gt_file, 'rt') as data:
+                for line in data:
+                    #chr, pos = line.strip().split()
+                    chr, pos = line.strip().split()[0:2]
+                    window = ceil(int(pos) / window_size) - 1
+                    snp[chr][window]+=1
+    else:
+        if data_type == "ancient":
+            sss = f"cat {gt_file} | awk '($5==1)'"
+            for line in os.popen(sss):
+                #chr, pos = line.strip().split()
+                chr, pos = line.strip().split()[0:2]
+                window = ceil(int(pos) / window_size) - 1
+                snp[chr][window]+=1
+        else:
+            with open(gt_file, 'r') as data:
+                for line in data:
+                    #chr, pos = line.strip().split()
+                    chr, pos = line.strip().split()[0:2]
+                    window = ceil(int(pos) / window_size) - 1
+                    snp[chr][window]+=1            
+    for chr in list(snp.keys()):   # has to start from (chr)1
+        
+        print(chr)
+        chr_index.append(int(chr))
+        first_w = sorted(list(call[chr].keys()))[0]  # assuming all are chr1
+        last_w = sorted(list(call[chr].keys()))[-1]
+        window_all.append(list(range(first_w, last_w+1)))
+        snps = np.zeros(last_w - first_w + 1)
+        for window in list(snp[chr].keys()):
+            snps[window-first_w] = snp[chr][window]   # snp from the first bin with data.
+            if snps[window-first_w] > max_variants:
+                snps[window-first_w] = max_variants
+                print(f"window {window}, chr{chr} has more than {max_variants} variants, set to {max_variants}, file {gt_file}")
+            #assert weights[int(chr)-1][window-first_w] >0 , f"weights for window {window} is 0 but there are derived in this window."
+
+        obs.append(snps)
+    return chr_index, weights, obs, call_index, window_all
 def get_mut_rates(mut_full, window_size, windows, obs_count, chr):
     '''
     window: window index
