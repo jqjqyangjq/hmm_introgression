@@ -114,7 +114,31 @@ def get_obs_gt(vcf, fa, out, mask = None):
                         elif gt == "0/1":
                             print(chr, pos, anc, dep, 1, A+BCD, sep = '\t',  file = f)
 
-
+def get_weights(bedfile, window_size): # return weights from the first window to the last window
+    first_window = 0
+    last_window = 0
+    weights = defaultdict(lambda: defaultdict(float))
+    with open(f"{bedfile}") as data:
+        print(f"loading mask file {bedfile}")
+        for line in data:
+            chr, start, end = line.strip().split('\t') 
+            start = int(start)
+            end = int(end)
+            start_window = ceil((start+0.5) / window_size) - 1
+            end_window = ceil((end - 0.5) / window_size) - 1
+            if start_window == end_window: # same window   start window 1, end window 1
+                weights[chr][start_window] += (end - start) / window_size
+            else:
+                weights[chr][start_window] += (window_size*(start_window+1) - start) / window_size
+            
+                if end_window > start_window + 1:       # fill in windows in the middle   start_window 1, end_window 4, so window 2 window3 will be filled as 1
+                    for window_tofill in range(start_window + 1, end_window):
+                        weights[chr][window_tofill] += float(1)
+                    weights[chr][end_window] += (end - end_window * window_size) / window_size
+                    
+                else:    # e.g. start window 1, end window 2
+                    weights[chr][start_window + 1] += (end - end_window * window_size) / window_size
+        return weights
 
 def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_dep = None, minimum_dep = None, rec = False):  # return g0 g1
     
