@@ -116,7 +116,7 @@ def get_obs_gt(vcf, fa, out, mask = None):
 
 
 
-def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_dep = None, minimum_dep = None):  # return g0 g1
+def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_dep = None, minimum_dep = None, rec = False):  # return g0 g1
     
     
     # free space for each chrom.
@@ -199,50 +199,9 @@ def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_
         obs_chrs.append([gl_0_, gl_1_])
         obs_count.append(obs_count_)
     return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
-"""
-def load_observations_rec(gll_file, window_size = 1000):  # return g0 g1
-    
-    
-    # free space for each chrom.
-    # cap on depth
-    gl = defaultdict(lambda:defaultdict(lambda: defaultdict(list)))
 
-    with gzip.open(gll_file, "rt") as data:
-        for line in data:
-            (
-                chrom,
-                pos,
-                _,
-                _,
-                Anc,
-                _,
-                _,
-                _,
-                _,
-                g0,
-                g1
-            ) = line.strip().split()
-            g_0 = float(g0)
-            g_1 = float(g1)
-            window = ceil(int(pos) / window_size) - 1
-            gl["g_0"][chrom][bin].append(g_0)
-            gl["g_1"][chrom][bin].append(g_1)
-    obs_chrs = []
-    obs_count = []
-    for chrom in list(gl["g_0"].keys()):
-        gl_0_ = []
-        gl_1_ = []
-        obs_count_ = []
-        for window in list(gl["g_0"][chrom].keys()):
-            gl_0_.append(np.array(gl["g_0"][chrom][window]))
-            obs_count_.append(len(gl["g_0"][chrom][window]))
-            gl_1_.append(np.array(gl["g_1"][chrom][window]))
-        obs_chrs.append([gl_0_, gl_1_])
-        obs_count.append(obs_count_)
-    return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
-"""
 
-def load_observations_gt_ancient(gt_file, mask_file, window_size, max_variants=20, data_type = "ancient" ):  # return number of variants
+def load_observations_gt(gt_file, mask_file, window_size, max_variants=20, data_type = "ancient" ):  # return number of variants
     chr = []
     chr_index = []  #chrs
     windows = []
@@ -272,7 +231,7 @@ def load_observations_gt_ancient(gt_file, mask_file, window_size, max_variants=2
     snp = defaultdict(lambda:defaultdict(int))
     if gt_file.endswith(".gz"):
         if data_type == "ancient":
-            sss = f"zcat {gt_file} | awk '($5==1)'"
+            sss = f"zcat {gt_file} | awk '($5 > 0)'"
             for line in os.popen(sss):
                 #chr, pos = line.strip().split()
                 chr, pos = line.strip().split()[0:2]
@@ -287,7 +246,7 @@ def load_observations_gt_ancient(gt_file, mask_file, window_size, max_variants=2
                     snp[chr][window]+=1
     else:
         if data_type == "ancient":
-            sss = f"cat {gt_file} | awk '($5==1)'"
+            sss = f"cat {gt_file} | awk '($5 > 0)'"
             for line in os.popen(sss):
                 #chr, pos = line.strip().split()
                 chr, pos = line.strip().split()[0:2]
@@ -356,38 +315,48 @@ def get_mut_rates(mut_full, window_size, windows, obs_count, chr):
     '''
     seems to load correctly. checked.
     '''
+def get_mut_rates_gt(mut_full, window_size, w, chr):
+    '''
+    window: window index
+    a chromsome
+    e.g. 0 1000000 1.5
+         1000000 2000000 2.5
+
+    '''
+    mut = []
+    mut_full = mut_full[mut_full['chrom'] == chr]
+    assert len(mut_full)!=0, f"mutation rate missing for chromsome {chr}"
+    current_window  = 0  #start from the first window with data, might be window_index 600.
+    inter = 0   #interval of mut rates
+    while current_window <= len(w):
+        while inter < len(mut_full):  
+            '''
+            window 100
+            100 * 1000 - 101 * 1000
+            '''
+            ''' go to current mut interval'''
+            if ((mut_full.iloc[inter]['start'] <= (w[current_window] * window_size)) and (mut_full.iloc[inter]['end'] >= (w[current_window] + 1) * window_size)):     
+                if (mut_full.iloc[inter]['mut_rate'] == 0):   
+                    '''
+                    might cause numerical problem. so far all 0 mut_rates are manully modifyed
+                    '''
+                    mut.extend([0.1])
+                else:
+                    mut.extend([mut_full.iloc[inter]['mut_rate']])
+                current_window += 1   # move to next window
+                break
+            inter += 1
+            #print(current_window)
+        if ((inter >= len(mut_full)) or (current_window >= len(w))):
+            break
+    print("mut rates load done") 
+    return np.array(mut)
+
+
 """
 I am lazy, so I directly calculate mutation rate either from simulation or from empirical data.
 No functions embedded so far.
 Super-high mutation rates comes from mappability filter. Nominator is too small in some windows.
-
-
-
-def get_mut_mis(afr_vcf, out_file, window_size, region_bed = None):
-    # get mutatino rate from simulated 50 afrs.
-    
-    '''
-    get weights for each window
-    '''
-    mut = defaultdict(lambda:defaultdict(list))
-    snp = f"zcat {afr_vcf} | sed 1d | awk '{{sum=0; for(i=25; i<=NF; i++) sum+=$i; print $1, $2, sum}}' "
-    for line in os.popen(snp):
-        chrom, pos, c = line.strip().split()
-        window = ceil(int(pos) / window_size) - 1
-        '''
-        count the number of mutations along each window
-        '''
-        if int(c) > 0:
-            mut[chrom][window].append(1)
-
-
-
-    if not region_bed is None:
-        for chrom in mut.keys():
-            for window in mut[chrom].keys():
-                start = window * window_size
-                end = (window + 1) * window_size 
-                
 """
 def find_runs(inarray):
     """ run length encoding. Partial credit to R rle function. 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import numpy as np
-from helper_f import load_observations, load_observations_gt, load_observations_gt_ancient, get_obs_gll, get_obs_gt
+from helper_f import load_observations, load_observations_gt, get_obs_gll, get_obs_gt
 from hmm import TrainModel, write_HMM_to_file, read_HMM_parameters_from_file, decode_from_params
 import pandas as pd
 from call import Call
@@ -80,8 +80,7 @@ def main():
                                  help="output of posterior from fwd-bwd", default = "Posterior.txt")
     train_gt_subparser.add_argument("-log_file", metavar='',
                                  help="output log info of baum-welch", default = "EM_iterration.log")
-    train_gt_subparser.add_argument("-iteration", metavar='', help = "max iteration for EM", type = int, default = 1000) 
-
+    train_gt_subparser.add_argument("-iteration", metavar='', help = "max iteration for EM", type = int, default = 1000)
     call_subparser = subparser.add_parser('call', help='call fragments based on posterior')
     call_subparser.add_argument("-posterior", metavar='',
                                  help="output of posterior from fwd-bwd")
