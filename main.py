@@ -120,6 +120,12 @@ def main():
         print(f"filter depth: {args.filter_depth}")
         print(f"fixed transition parameters: {args.not_est_transition}")
         print(args.param)
+        with open(args.log_file, 'w') as log_file:
+            log_file.write(f"fixed transition parameters: {args.not_est_transition}\n")
+            log_file.write(f"window size: {args.window_size}\n")
+            log_file.write(f"filter depth: {args.filter_depth}\n")
+            log_file.write(f"max depth: {args.maximum_dep}\n")
+            log_file.write(f"min depth: {args.minimum_dep}\n")
         observation, chrs, windows, obs_count = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep)
         print('-' * 40)
         print('> Output is',args.out) 
