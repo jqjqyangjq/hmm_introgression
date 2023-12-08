@@ -11,7 +11,7 @@ def main():
     parser = argparse.ArgumentParser(add_help = True)
 
     subparser = parser.add_subparsers(dest = 'mode')
-    getobs_subparser = subparser.add_parser('Get_obs', help='convert either genotype or gll file to observation file')  # converting snpAD results to observation, per chr. might need to concatenate later.
+    getobs_subparser = subparser.add_parser('get_obs', help='convert either genotype or gll file to observation file')  # converting snpAD results to observation, per chr. might need to concatenate later.
     getobs_subparser.add_argument("-type", metavar='', 
                                  help="[required] data type, either 'gll' by snpAD, or per individual 'gt' by snpad/genotypecaller", type=str, required = True)
     getobs_subparser.add_argument("-vcf", metavar='', help="[required] vcf file", type=str, default= None, required = True)
@@ -89,7 +89,7 @@ def main():
     call_subparser.add_argument("-called", metavar='',
                                     help="output of called fragments", default = "called.txt")
     args = parser.parse_args()
-    if args.mode == 'Get_obs':
+    if args.mode == 'get_obs':
         print(f"producing observation file for HMM from {args.vcf}, to observation outfile {args.out}, with mask file: {args.mask}")
         if not hasattr(args, 'ancestral'):
             parser.print_help()
