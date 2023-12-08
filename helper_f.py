@@ -104,15 +104,15 @@ def get_obs_gt(vcf, fa, out, mask = None):
                             if anc == A:
                                 print(chr, pos, anc, dep, 0, A+A, sep = '\t', file = f)
                             else:
-                                print(chr, pos, anc, dep, 2, BCD+BCD, sep = '\t', file = f)
+                                print(chr, pos, anc, dep, 2, A+A, sep = '\t', file = f)
                         elif gt == "1/1":   # homozygous alternative.    anc must be alt
                             B = BCD.split(',')[0]
                             if anc == B:
-                                print(chr, pos, anc, dep, 0, BCD+BCD, sep = '\t', file = f)
+                                print(chr, pos, anc, dep, 0, BCD[0]+BCD[0], sep = '\t', file = f)
                             else:
-                                print(chr, pos, anc, dep, 2, BCD+BCD, sep = '\t', file = f)
+                                print(chr, pos, anc, dep, 2, BCD[0]+BCD[0], sep = '\t', file = f)
                         elif gt == "0/1":
-                            print(chr, pos, anc, dep, 1, A+BCD, sep = '\t',  file = f)
+                            print(chr, pos, anc, dep, 1, A+BCD[0], sep = '\t',  file = f)
 
 def get_weights(bedfile, window_size): # return weights from the first window to the last window
     first_window = 0
