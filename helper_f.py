@@ -140,7 +140,8 @@ def get_weights(bedfile, window_size): # return weights from the first window to
                     weights[chr][start_window + 1] += (end - end_window * window_size) / window_size
         return weights
 
-def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_dep = None, minimum_dep = None, rec = False):  # return g0 g1
+def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_dep = None, minimum_dep = None, 
+rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
     
     
     # free space for each chrom.
@@ -153,6 +154,94 @@ def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_
                 ne = line.strip().split()
                 len_ne = len(ne)
                 break
+    if rec == True:
+        print(f"binning data based on {rec_bed} ")
+        print(f"loading mut rates based on {mut_bed} ")
+        m = defaultdict(list)
+        rec_bed = pd.read_csv(rec_bed, sep = '\t', dtype = {'chrom':str, 'start':int, 'end':int, 'window':str})
+        loop_rec = rec_bed.iterrows()
+        row_rec = next(loop_rec)[1]
+        mut_bed = pd.read_csv(rec_bed, sep = '\t', names = ['chrom', 'start', 'end', 'rate'], dtype = {'chrom':str, 'start':int, 'end':int, 'rate':float})
+        loop_rec = mut_bed.iterrows()
+        row_mut = next(loop_rec)[1]
+        if len_ne == 6:
+            print(f"loading real data from {gll_file}")
+            with gzip.open(gll_file, "rt") as data:
+                if filter_depth is False:
+                    for line in data:
+                        (
+                            chrom,
+                            pos,
+                            _,
+                            _,
+                            g0,
+                            g1
+                        ) = line.strip().split()
+                        g_0 = float(g0)
+                        g_1 = float(g1)
+                        #window = ceil(int(pos) / window_size) - 1
+                        while row_rec.chrom != chrom:
+                            row_rec = next(loop_rec)[1]
+                        while row_rec.end < int(pos):
+                            row_rec = next(loop_rec)[1]
+                        while row_mut.chrom != chrom:
+                            row_mut = next(loop_rec)[1]
+                        while row_mut.end < int(pos):
+                            row_mut = next(loop_rec)[1]
+                        window = row.window
+                        m[chrom].append(row_mut.rate)
+                        gl["g_0"][chrom][window].append(g_0)
+                        gl["g_1"][chrom][window].append(g_1)
+                else:
+                    assert not (maximum_dep is None), "maximum_dep is not None"
+                    assert not (minimum_dep is None), "minimum_dep is not None"
+                    print(f"keep positions with depth <= {maximum_dep} or depth >= {minimum_dep}")
+                    for line in data:
+                        (
+                            chrom,
+                            pos,
+                            _,
+                            dep,
+                            g0,
+                            g1
+                        ) = line.strip().split()
+                        if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
+                            g_0 = float(g0)
+                            g_1 = float(g1)
+                            #window = ceil(int(pos) / window_size) - 1
+                            while row.chrom != chrom:
+                                row = next(loop_rec)[1]
+                            while row.end < int(pos):
+                                row = next(loop_rec)[1]
+                            while row_mut.chrom != chrom:
+                                row_mut = next(loop_rec)[1]
+                            while row_mut.end < int(pos):
+                                row_mut = next(loop_rec)[1]
+                            window = row.window
+                            m[chrom].append(row_mut.rate)
+                            gl["g_0"][chrom][window].append(g_0)
+                            gl["g_1"][chrom][window].append(g_1)
+        else:
+            print("data format not supported (cuurently not desiged not simulated dataset)")
+        obs_chrs = []
+        obs_count = []
+        for chrom in list(gl["g_0"].keys()):
+            gl_0_ = []
+            gl_1_ = []
+            obs_count_ = []
+            for window in list(gl["g_0"][chrom].keys()):
+                gl_0_.append(np.array(gl["g_0"][chrom][window]))
+                obs_count_.append(len(gl["g_0"][chrom][window]))
+                gl_1_.append(np.array(gl["g_1"][chrom][window]))
+            obs_chrs.append([gl_0_, gl_1_])
+            obs_count.append(obs_count_)
+
+        for chrom in list(m.keys()):
+            m_rates = []
+
+        return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
+
+
     if len_ne == 9:
         print(f"loading simulated data from {gll_file}")
         with gzip.open(gll_file, "rt") as data:
@@ -225,7 +314,8 @@ def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_
     return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
 
 
-def load_observations_gt(gt_file, mask_file, window_size, max_variants=20, data_type = "ancient" ):  # return number of variants
+def load_observations_gt(gt_file, mask_file, window_size, max_variants, data_type, 
+filter_depth, minimum_dep, maximum_dep):  # return number of variants
     chr = []
     chr_index = []  #chrs
     windows = []
@@ -256,11 +346,19 @@ def load_observations_gt(gt_file, mask_file, window_size, max_variants=20, data_
     if gt_file.endswith(".gz"):
         if data_type == "ancient":
             sss = f"zcat {gt_file} | awk '($5 > 0)'"
-            for line in os.popen(sss):
-                #chr, pos = line.strip().split()
-                chr, pos = line.strip().split()[0:2]
-                window = ceil(int(pos) / window_size) - 1
-                snp[chr][window]+=1
+            if filter_depth is True:
+                for line in os.popen(sss):
+                    #chr, pos = line.strip().split()
+                    chr, pos, _, dep = line.strip().split()[0:4]
+                    if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
+                        window = ceil(int(pos) / window_size) - 1
+                        snp[chr][window]+=1
+            else:
+                for line in os.popen(sss):
+                    #chr, pos = line.strip().split()
+                    chr, pos, = line.strip().split()[0:2]
+                    window = ceil(int(pos) / window_size) - 1
+                    snp[chr][window]+=1
         else:
             with gzip.open(gt_file, 'rt') as data:
                 for line in data:
@@ -268,7 +366,7 @@ def load_observations_gt(gt_file, mask_file, window_size, max_variants=20, data_
                     chr, pos = line.strip().split()[0:2]
                     window = ceil(int(pos) / window_size) - 1
                     snp[chr][window]+=1
-    else:
+    else:  # not gz, must be from simulations
         if data_type == "ancient":
             sss = f"cat {gt_file} | awk '($5 > 0)'"
             for line in os.popen(sss):

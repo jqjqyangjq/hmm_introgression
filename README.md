@@ -10,3 +10,4 @@ Assume a pre-calculated mutrate file across the genome, otherwise assume constan
 Assume pre-calculated gll input file, taking damamge pattern into account.
 (testing for uncertainty in gll calculating)
 test
+Also include pretty much similar gt mode to LS hmmix but different in : Optimizing emission parameters using windows with data only. (LS used all windows)

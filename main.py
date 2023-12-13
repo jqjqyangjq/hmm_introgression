@@ -56,16 +56,21 @@ def main():
                                  help="size of bins (default is 1000 bp)", type=int, default = 1000)
     decode_subparser.add_argument("-posterior", metavar='',
                                  help="output of posterior from fwd-bwd", default = "Posterior.txt")
+    decode_subparser.add_argument("-log_file", metavar='',
+                                 help="output log info of forward-backward decoding", default = None)
     decode_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = None)
     decode_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = None)
 
     train_gt_subparser = subparser.add_parser('gt_mode', help='Train HMM')
-    train_gt_subparser.add_argument("-data_type", metavar='',help="[required] data type: modern genotypes or ancient genotyes", type=str, required = True)
+    train_gt_subparser.add_argument("-data_type", metavar='',help="[required] data type: modern genotypes or ancient genotyes", type=str, default = "ancient")
 
     train_gt_subparser.add_argument("-count_file", metavar='', 
                                  help="[required] count of derived alleles", type=str, required = True)
     train_gt_subparser.add_argument("-max_variants_per_window", metavar='',
                                  help="maximum number of variants per window allowed", type=int, default = 20)
+    train_gt_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage",  default = False)
+    train_gt_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = 0)
+    train_gt_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = 200)
     train_gt_subparser.add_argument("-mask_file", metavar='',
                                  help="file with integrated mask", type=str, default=None)
     train_gt_subparser.add_argument("-mut_file", metavar='',
@@ -149,14 +154,16 @@ def main():
         if not hasattr(args, 'gll_file'):
             parser.print_help()
             return
-        with open(args.log_file, 'a') as log_file:
-            print("decoding", file = log_file)
-            print(f"mut rate file: {args.mut_file}", file = log_file)
-            log_file.write(f"window size: {args.window_size}\n")
-            log_file.write(f"filter depth: {args.filter_depth}\n")
-            log_file.write(f"max depth: {args.maximum_dep}\n")
-            log_file.write(f"min depth: {args.minimum_dep}\n")
-        hmm_parameters = read_HMM_parameters_from_file(args.param)
+        if not args.log_file is None:
+            with open(args.log_file, 'a') as log_file:
+                print("decoding", file = log_file)
+                print(f"mut rate file: {args.mut_file}", file = log_file)
+                print(f"posterior file: {args.posterior}", file = log_file)
+                log_file.write(f"window size: {args.window_size}\n")
+                log_file.write(f"filter depth: {args.filter_depth}\n")
+                log_file.write(f"max depth: {args.maximum_dep}\n")
+                log_file.write(f"min depth: {args.minimum_dep}\n")
+            hmm_parameters = read_HMM_parameters_from_file(args.param)
         observation, chrs, windows, obs_count = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep)
         print('-' * 40)
         print(hmm_parameters)
@@ -182,11 +189,11 @@ def main():
         if args.data_type == "modern":
             print(f"loading snp-only input data {args.count_file} with modern mask {args.mask_file}, with window size {args.window_size}")
             print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
-            chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, args.mask_file, args.window_size, args.max_variants_per_window, "modern")
+            chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, args.mask_file, args.window_size, args.max_variants_per_window, "modern", args.filter_depth, args.minimum_dep, args.maximum_dep)
         if args.data_type == "ancient":
             print(f"loading all-pos input data {args.count_file} with ancient per-individual mask {args.mask_file}, with window size {args.window_size}")
             print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
-            chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, args.mask_file, args.window_size, args.max_variants_per_window, "ancient")
+            chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, args.mask_file, args.window_size, args.max_variants_per_window, "ancient", args.filter_depth, args.minimum_dep, args.maximum_dep)
         #check for zero:
 
         print(f"finished loading {args.count_file}")
@@ -196,6 +203,19 @@ def main():
         print('> Output is',args.out) 
         print('> Window size is',args.window_size, 'bp') 
         print('-' * 40)
+        with open(args.log_file, 'w') as log_file:
+            log_file.write(f"{hmm_parameters}\n")
+            log_file.write(f"maximum number of variants per window allowed is {args.max_variants_per_window}\n")
+            log_file.write(f"output file: {args.out}\n")
+            log_file.write(f"window size: {args.window_size}\n")
+            log_file.write(f"mut rate file: {args.mut_file}\n")
+            log_file.write(f"posteiors file: {args.posterior}\n")
+            if args.filter_depth:
+                log_file.write(f"filter depth: {args.filter_depth}\n")
+                log_file.write(f"max depth: {args.maximum_dep}\n")
+                log_file.write(f"min depth: {args.minimum_dep}\n")
+            else:
+                log_file.write("no filter on depth\n")
         hmm_parameters = TrainModel_GT(obs = obs,
                                 weights = weights,
                                 chr_index = chr_index,
