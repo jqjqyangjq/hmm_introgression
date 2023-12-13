@@ -6,6 +6,83 @@ import json
 from math import exp, ceil
 import os 
 import gzip
+
+def get_mut_rates(mut_full, window_size, windows, obs_count, chr):
+    '''
+    window: window index
+    a chromsome
+    e.g. 0 1000000 1.5
+         1000000 2000000 2.5
+
+    '''
+    mut = []
+    mut_full = mut_full[mut_full['chrom'] == chr]
+    assert len(mut_full)!=0, f"mutation rate missing for chromsome {chr}"
+    current_window = 0
+    inter = 0   #interval of mut rates
+    while current_window <= len(windows):
+        while inter < len(mut_full):  
+            '''
+            window 100
+            100 * 1000 - 101 * 1000
+            '''
+
+
+            ''' go to current mut interval'''
+            if ((mut_full.iloc[inter]['start'] <= (windows[current_window] * window_size)) and (mut_full.iloc[inter]['end'] >= (windows[current_window] + 1) * window_size)):
+                if (mut_full.iloc[inter]['mut_rate'] == 0) and (obs_count[current_window] > 0):   
+                    '''
+                    might cause numerical problem. so far all 0 mut_rates are manully modifyed
+                    '''
+                    mut.extend([0.000125] * obs_count[current_window])
+                else:   
+                    mut.extend([mut_full.iloc[inter]['mut_rate']] * obs_count[current_window])
+                current_window += 1
+                break
+            inter += 1
+        if ((inter >= len(mut_full)) or (current_window >= len(windows))):
+            break
+    return mut
+    '''
+    seems to load correctly. checked.
+    '''
+def get_mut_rates_gt(mut_full, window_size, w, chr):
+    '''
+    window: window index
+    a chromsome
+    e.g. 0 1000000 1.5
+         1000000 2000000 2.5
+
+    '''
+    mut = []
+    mut_full = mut_full[mut_full['chrom'] == chr]
+    assert len(mut_full)!=0, f"mutation rate missing for chromsome {chr}"
+    current_window  = 0  #start from the first window with data, might be window_index 600.
+    inter = 0   #interval of mut rates
+    while current_window <= len(w):
+        while inter < len(mut_full):  
+            '''
+            window 100
+            100 * 1000 - 101 * 1000
+            '''
+            ''' go to current mut interval'''
+            if ((mut_full.iloc[inter]['start'] <= (w[current_window] * window_size)) and (mut_full.iloc[inter]['end'] >= (w[current_window] + 1) * window_size)):     
+                if (mut_full.iloc[inter]['mut_rate'] == 0):   
+                    '''
+                    might cause numerical problem. so far all 0 mut_rates are manully modifyed
+                    '''
+                    mut.extend([0.1])
+                else:
+                    mut.extend([mut_full.iloc[inter]['mut_rate']])
+                current_window += 1   # move to next window
+                break
+            inter += 1
+            #print(current_window)
+        if ((inter >= len(mut_full)) or (current_window >= len(w))):
+            break
+    print("mut rates load done") 
+    return np.array(mut)
+
 def load_fasta(fasta_file):
     '''
     Read a fasta file with a single chromosome in and return the sequence as a string
@@ -158,61 +235,33 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
         print(f"binning data based on {rec_bed} ")
         print(f"loading mut rates based on {mut_bed} ")
         m = defaultdict(list)
-        rec_bed = pd.read_csv(rec_bed, sep = '\t', dtype = {'chrom':str, 'start':int, 'end':int, 'window':str})
+        rec_bed = pd.read_csv(rec_bed, sep = '\t', dtype = {'chr':str, 'start':int, 'end':int, 'window':int})
         loop_rec = rec_bed.iterrows()
         row_rec = next(loop_rec)[1]
-        mut_bed = pd.read_csv(rec_bed, sep = '\t', names = ['chrom', 'start', 'end', 'rate'], dtype = {'chrom':str, 'start':int, 'end':int, 'rate':float})
-        loop_rec = mut_bed.iterrows()
-        row_mut = next(loop_rec)[1]
         if len_ne == 6:
             print(f"loading real data from {gll_file}")
             with gzip.open(gll_file, "rt") as data:
-                if filter_depth is False:
-                    for line in data:
-                        (
-                            chrom,
-                            pos,
-                            _,
-                            _,
-                            g0,
-                            g1
-                        ) = line.strip().split()
-                        g_0 = float(g0)
-                        g_1 = float(g1)
-                        #window = ceil(int(pos) / window_size) - 1
-                        while row_rec.chrom != chrom:
-                            row_rec = next(loop_rec)[1]
-                        while row_rec.end < int(pos):
-                            row_rec = next(loop_rec)[1]
-                        while row_mut.chrom != chrom:
-                            row_mut = next(loop_rec)[1]
-                        while row_mut.end < int(pos):
-                            row_mut = next(loop_rec)[1]
-                        window = row.window
-                        m[chrom].append(row_mut.rate)
-                        gl["g_0"][chrom][window].append(g_0)
-                        gl["g_1"][chrom][window].append(g_1)
-                else:
-                    assert not (maximum_dep is None), "maximum_dep is not None"
-                    assert not (minimum_dep is None), "minimum_dep is not None"
-                    print(f"keep positions with depth <= {maximum_dep} or depth >= {minimum_dep}")
-                    for line in data:
-                        (
-                            chrom,
-                            pos,
-                            _,
-                            dep,
-                            g0,
-                            g1
-                        ) = line.strip().split()
-                        if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
+                if not mut_bed is None:
+                    mut_bed = pd.read_csv(rec_bed, sep = '\t', names = ['chrom', 'start', 'end', 'rate'], dtype = {'chrom':str, 'start':int, 'end':int, 'rate':float})
+                    loop_rec = mut_bed.iterrows()
+                    row_mut = next(loop_rec)[1]
+                    if filter_depth is False:
+                        for line in data:
+                            (
+                                chrom,
+                                pos,
+                                _,
+                                _,
+                                g0,
+                                g1
+                            ) = line.strip().split()
                             g_0 = float(g0)
                             g_1 = float(g1)
                             #window = ceil(int(pos) / window_size) - 1
-                            while row.chrom != chrom:
-                                row = next(loop_rec)[1]
-                            while row.end < int(pos):
-                                row = next(loop_rec)[1]
+                            while row_rec.chrom != chrom:
+                                row_rec = next(loop_rec)[1]
+                            while row_rec.end < int(pos):
+                                row_rec = next(loop_rec)[1]
                             while row_mut.chrom != chrom:
                                 row_mut = next(loop_rec)[1]
                             while row_mut.end < int(pos):
@@ -221,25 +270,99 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             m[chrom].append(row_mut.rate)
                             gl["g_0"][chrom][window].append(g_0)
                             gl["g_1"][chrom][window].append(g_1)
+                    else:
+                        assert not (maximum_dep is None), "maximum_dep is not None"
+                        assert not (minimum_dep is None), "minimum_dep is not None"
+                        print(f"keep positions with depth <= {maximum_dep} or depth >= {minimum_dep}")
+                        for line in data:
+                            (
+                                chrom,
+                                pos,
+                                _,
+                                dep,
+                                g0,
+                                g1
+                            ) = line.strip().split()
+                            if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
+                                g_0 = float(g0)
+                                g_1 = float(g1)
+                                #window = ceil(int(pos) / window_size) - 1
+                                while row.chrom != chrom:
+                                    row = next(loop_rec)[1]
+                                while row.end < int(pos):
+                                    row = next(loop_rec)[1]
+                                while row_mut.chrom != chrom:
+                                    row_mut = next(loop_rec)[1]
+                                while row_mut.end < int(pos):
+                                    row_mut = next(loop_rec)[1]
+                                window = row.window
+                                m[chrom].append(row_mut.rate)
+                                gl["g_0"][chrom][window].append(g_0)
+                                gl["g_1"][chrom][window].append(g_1)
+                else: # No mut bed provided. For real data, not mut bed should be provided when tranning parameters
+                    if filter_depth is False:
+                        for line in data:
+                            (
+                                chrom,
+                                pos,
+                                _,
+                                _,
+                                g0,
+                                g1
+                            ) = line.strip().split()
+                            g_0 = float(g0)
+                            g_1 = float(g1)
+                            #window = ceil(int(pos) / window_size) - 1
+                            while row_rec.chr != chrom:
+                                row_rec = next(loop_rec)[1]
+                            while row_rec.end < int(pos):
+                                row_rec = next(loop_rec)[1]
+                            window = row.window
+                            m[chrom].append(1)
+                            gl["g_0"][chrom][window].append(g_0)
+                            gl["g_1"][chrom][window].append(g_1)
+                    else:
+                        assert not (maximum_dep is None), "maximum_dep is not None"
+                        assert not (minimum_dep is None), "minimum_dep is not None"
+                        print(f"keep positions with depth <= {maximum_dep} or depth >= {minimum_dep}")
+                        for line in data:
+                            (
+                                chrom,
+                                pos,
+                                _,
+                                dep,
+                                g0,
+                                g1
+                            ) = line.strip().split()
+                            if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
+                                g_0 = float(g0)
+                                g_1 = float(g1)
+                                #window = ceil(int(pos) / window_size) - 1
+                                while row_rec.chr != chrom:
+                                    row_rec = next(loop_rec)[1]
+                                while row_rec.end < int(pos):
+                                    row_rec = next(loop_rec)[1]
+                                window = row_rec.window
+                                m[chrom].append(1)
+                                gl["g_0"][chrom][window].append(g_0)
+                                gl["g_1"][chrom][window].append(g_1)
         else:
             print("data format not supported (cuurently not desiged not simulated dataset)")
         obs_chrs = []
         obs_count = []
+        m_rates = []
         for chrom in list(gl["g_0"].keys()):
             gl_0_ = []
             gl_1_ = []
             obs_count_ = []
             for window in list(gl["g_0"][chrom].keys()):
                 gl_0_.append(np.array(gl["g_0"][chrom][window]))
-                obs_count_.append(len(gl["g_0"][chrom][window]))
                 gl_1_.append(np.array(gl["g_1"][chrom][window]))
             obs_chrs.append([gl_0_, gl_1_])
-            obs_count.append(obs_count_)
 
         for chrom in list(m.keys()):
-            m_rates = []
-
-        return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
+            m_rates.append(np.array(m[chrom]))
+        return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), m_rates
 
 
     if len_ne == 9:
@@ -262,7 +385,7 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                 window = ceil(int(pos) / window_size) - 1
                 gl["g_0"][chrom][window].append(g_0)
                 gl["g_1"][chrom][window].append(g_1)
-    if len_ne == 6:
+    elif len_ne == 6:
         print(f"loading real data from {gll_file}")
         with gzip.open(gll_file, "rt") as data:
             if filter_depth is False:
@@ -299,9 +422,16 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                         window = ceil(int(pos) / window_size) - 1
                         gl["g_0"][chrom][window].append(g_0)
                         gl["g_1"][chrom][window].append(g_1)
+    else:
+        print("data format not supported (cuurently not desiged not simulated dataset)")
     obs_chrs = []
     obs_count = []
-    for chrom in list(gl["g_0"].keys()):
+    m_rates = []
+    if not mut_bed is None:
+        m_rates_full = pd.read_csv(mut_bed, sep = '\t', 
+                               header = None, names = ["chrom", "start", "end", "mut_rate"],
+                               dtype = {"chrom": str, "start": int, "end": int, "mut_rate": float})
+    for index, chrom in enumerate(list(gl["g_0"].keys())):
         gl_0_ = []
         gl_1_ = []
         obs_count_ = []
@@ -311,7 +441,15 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
             gl_1_.append(np.array(gl["g_1"][chrom][window]))
         obs_chrs.append([gl_0_, gl_1_])
         obs_count.append(obs_count_)
-    return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), obs_count
+        if mut_bed is None:
+            m_rates_ = np.ones(sum(obs_count_))
+        else:
+            m_rates_ = get_mut_rates(m_rates_full, window_size, list(list(gl["g_0"][chrom].keys())), obs_count[index], list(gl["g_0"].keys())[index])
+        m_rates.append(m_rates_)
+        l = len(m_rates_)
+        l1 = sum(obs_count_)
+        assert l==l1, f"missing part of mut rates for obs in {chrom} chromsome, {l} mut records, {l1} obs records"
+    return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), m_rates
 
 
 def load_observations_gt(gt_file, mask_file, window_size, max_variants, data_type, 
@@ -398,81 +536,6 @@ filter_depth, minimum_dep, maximum_dep):  # return number of variants
 
         obs.append(snps)
     return chr_index, weights, obs, call_index, window_all
-def get_mut_rates(mut_full, window_size, windows, obs_count, chr):
-    '''
-    window: window index
-    a chromsome
-    e.g. 0 1000000 1.5
-         1000000 2000000 2.5
-
-    '''
-    mut = []
-    mut_full = mut_full[mut_full['chrom'] == chr]
-    assert len(mut_full)!=0, f"mutation rate missing for chromsome {chr}"
-    current_window = 0
-    inter = 0   #interval of mut rates
-    while current_window <= len(windows):
-        while inter < len(mut_full):  
-            '''
-            window 100
-            100 * 1000 - 101 * 1000
-            '''
-
-
-            ''' go to current mut interval'''
-            if ((mut_full.iloc[inter]['start'] <= (windows[current_window] * window_size)) and (mut_full.iloc[inter]['end'] >= (windows[current_window] + 1) * window_size)):
-                if (mut_full.iloc[inter]['mut_rate'] == 0) and (obs_count[current_window] > 0):   
-                    '''
-                    might cause numerical problem. so far all 0 mut_rates are manully modifyed
-                    '''
-                    mut.extend([0.000125] * obs_count[current_window])
-                else:   
-                    mut.extend([mut_full.iloc[inter]['mut_rate']] * obs_count[current_window])
-                current_window += 1
-                break
-            inter += 1
-        if ((inter >= len(mut_full)) or (current_window >= len(windows))):
-            break
-    return mut
-    '''
-    seems to load correctly. checked.
-    '''
-def get_mut_rates_gt(mut_full, window_size, w, chr):
-    '''
-    window: window index
-    a chromsome
-    e.g. 0 1000000 1.5
-         1000000 2000000 2.5
-
-    '''
-    mut = []
-    mut_full = mut_full[mut_full['chrom'] == chr]
-    assert len(mut_full)!=0, f"mutation rate missing for chromsome {chr}"
-    current_window  = 0  #start from the first window with data, might be window_index 600.
-    inter = 0   #interval of mut rates
-    while current_window <= len(w):
-        while inter < len(mut_full):  
-            '''
-            window 100
-            100 * 1000 - 101 * 1000
-            '''
-            ''' go to current mut interval'''
-            if ((mut_full.iloc[inter]['start'] <= (w[current_window] * window_size)) and (mut_full.iloc[inter]['end'] >= (w[current_window] + 1) * window_size)):     
-                if (mut_full.iloc[inter]['mut_rate'] == 0):   
-                    '''
-                    might cause numerical problem. so far all 0 mut_rates are manully modifyed
-                    '''
-                    mut.extend([0.1])
-                else:
-                    mut.extend([mut_full.iloc[inter]['mut_rate']])
-                current_window += 1   # move to next window
-                break
-            inter += 1
-            #print(current_window)
-        if ((inter >= len(mut_full)) or (current_window >= len(w))):
-            break
-    print("mut rates load done") 
-    return np.array(mut)
 
 
 """

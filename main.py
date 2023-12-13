@@ -38,12 +38,15 @@ def main():
                                  help="output log info of baum-welch", default = "EM_iterration.log")
     train_subparser.add_argument("-iteration", metavar='', help = "max iteration for EM", type = int, default = 1000)
     train_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage",  default = False)
+    train_subparser.add_argument("-rec", action='store_true', help = "binning genome by genetic length, default False. rec map in bed format required",  default = False)
+    train_subparser.add_argument("-rec_map", metavar='',
+                                 help="recombination map in bed format (interpolated)", type=str, default=None)
     train_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = None)
     train_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = None)
     train_subparser.add_argument("-not_est_transition",  action='store_true', help = "estimate transition parameter or not", default= False)
     train_subparser.add_argument("-transition_1", metavar='',  help = "transition_param_1", default= None, type=float)
     train_subparser.add_argument("-transition_2", metavar='',  help = "transition_param_2", default= None, type=float)
-
+    
     decode_subparser = subparser.add_parser('decode', help='Decode posterior from params trained')
     decode_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage", default = False)
     decode_subparser.add_argument("-gll_file", metavar='', 
@@ -127,12 +130,16 @@ def main():
         print(args.param)
         with open(args.log_file, 'w') as log_file:
             log_file.write(f"fixed transition parameters: {args.not_est_transition}\n")
-            log_file.write(f"window size: {args.window_size}\n")
+            if args.rec is True:
+                log_file.write(f"using rec map: {args.rec_map}\n")
+            else:
+                log_file.write(f"window size: {args.window_size}\n")
             log_file.write(f"filter depth: {args.filter_depth}\n")
             log_file.write(f"max depth: {args.maximum_dep}\n")
             log_file.write(f"min depth: {args.minimum_dep}\n")
             log_file.write(f"mut rate file: {args.mut_file}\n")
-        observation, chrs, windows, obs_count = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep)
+        observation, chrs, windows, m_rates = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep,
+        args.rec, args.rec_map, args.mut_file)
         print('-' * 40)
         print('> Output is',args.out) 
         print('> Window size is',args.window_size, 'bp') 
@@ -140,12 +147,10 @@ def main():
         hmm_parameters = TrainModel(raw_obs = observation,
                                  chr_index = chrs,
                                  w= windows,
-                                 obs_count = obs_count,
-                                 window_size = args.window_size,
                                  post_file= args.posterior,
                                  log_file = args.log_file,
                                  pars = hmm_parameters,
-                                 m_rates_file = args.mut_file,
+                                 m_rates = m_rates,
                                  maxiterations=args.iteration,
                                  not_est_trans = args.not_est_transition)
         write_HMM_to_file(hmm_parameters, args.out)
@@ -164,7 +169,8 @@ def main():
                 log_file.write(f"max depth: {args.maximum_dep}\n")
                 log_file.write(f"min depth: {args.minimum_dep}\n")
             hmm_parameters = read_HMM_parameters_from_file(args.param)
-        observation, chrs, windows, obs_count = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep)
+        observation, chrs, windows, m_rates = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep,
+        args.rec, args.rec_map, args.mut_file)
         print('-' * 40)
         print(hmm_parameters)
         print('> Window size is',args.window_size, 'bp') 
@@ -172,11 +178,9 @@ def main():
         decode_from_params(raw_obs = observation,
                         chr_index = chrs,
                         w= windows,
-                        obs_count = obs_count,
-                        window_size = args.window_size,
                         post_file= args.posterior,
                         pars = hmm_parameters,
-                        m_rates_file = args.mut_file)
+                        m_rates = m_rates)
     if args.mode == 'gt_mode':   # same as Larits. But starts with the first callable position.
         if not hasattr(args, 'count_file'):
             parser.print_help()

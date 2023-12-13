@@ -259,8 +259,8 @@ def update_post_geno(PG, SNP, Z, SNP2BIN):
 
     return PG
 
-def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, not_est_trans, window_size = 1000, 
-               epsilon=5e-4, maxiterations=1000, log_file = None, m_rates_file = None):
+def TrainModel(raw_obs, chr_index, w, pars, post_file, not_est_trans, m_rates,
+               epsilon=5e-4, maxiterations=1000, log_file = None):
 
     print(f"Fix transition parameter(in case low coverage): {not_est_trans}")
     '''
@@ -293,11 +293,7 @@ def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, not_est_trans,
     fwd = []
     bwd = []
     scales = []
-    m_rates = []
-    if not m_rates_file is None:
-        m_rates_full = pd.read_csv(m_rates_file, sep = '\t', 
-                               header = None, names = ["chrom", "start", "end", "mut_rate"],
-                               dtype = {"chrom": str, "start": int, "end": int, "mut_rate": float})
+
     for chr in range(n_chr):
         n_windows[chr] = w[chr][-1] - w[chr][0] + 1
         GLL_, SNP2BIN_ = linearize_obs(raw_obs[chr], w[chr])
@@ -317,12 +313,7 @@ def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, not_est_trans,
         SNP.append(SNP_)
         PG_ = np.zeros((n_snp, n_states, n_gt))
         PG.append(PG_)
-        if m_rates_file is None:
-            m_rates_ = np.ones(n_snp)
-        else:
-            m_rates_ = get_mut_rates(m_rates_full, window_size, w[chr], obs_count[chr], chr_index[chr])
-        m_rates.append(m_rates_)
-        assert len(m_rates_) == n_snp, f"missing part of mutation rates for obs in {chr}-th chromsome"
+
     # the data and an indexing array
     # adapted from admixfrog
     # create arrays for posterior, emissions
@@ -397,8 +388,7 @@ def TrainModel(raw_obs, chr_index, w, obs_count, pars, post_file, not_est_trans,
     #return pars, Z, E, PG, SNP, GLL, SNP2BIN    # all arrays must be same length
     return pars
 
-def decode_from_params(raw_obs, chr_index, w, obs_count, pars, post_file, window_size = 1000,
-             m_rates_file = None):
+def decode_from_params(raw_obs, chr_index, w, obs_count, pars, post_file, m_rates, window_size = 1000,):
     n_chr = len(chr_index)
     n_states = len(pars.starting_probabilities)
     n_windows = np.ones(n_chr)
@@ -415,11 +405,6 @@ def decode_from_params(raw_obs, chr_index, w, obs_count, pars, post_file, window
     fwd = []
     bwd = []
     scales = []
-    m_rates = []
-    if not m_rates_file is None:
-        m_rates_full = pd.read_csv(m_rates_file, sep = '\t', 
-                               header = None, names = ["chrom", "start", "end", "mut_rate"],
-                               dtype = {"chrom": str, "start": int, "end": int, "mut_rate": float})
     for chr in range(n_chr):
         n_windows[chr] = w[chr][-1] - w[chr][0] + 1
         GLL_, SNP2BIN_ = linearize_obs(raw_obs[chr], w[chr])
@@ -439,12 +424,6 @@ def decode_from_params(raw_obs, chr_index, w, obs_count, pars, post_file, window
         SNP.append(SNP_)
         PG_ = np.zeros((n_snp, n_states, n_gt))
         PG.append(PG_)
-        if m_rates_file is None:
-            m_rates_ = np.ones(n_snp)
-        else:
-            m_rates_ = get_mut_rates(m_rates_full, window_size, w[chr], obs_count[chr], chr_index[chr])
-        m_rates.append(m_rates_)
-        assert len(m_rates_) == n_snp, f"missing part of mutation rates for obs in {chr}-th chromsome"
     # the data and an indexing array
     # adapted from admixfrog
     # create arrays for posterior, emissions
