@@ -242,9 +242,9 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
             print(f"loading real data from {gll_file}")
             with gzip.open(gll_file, "rt") as data:
                 if not mut_bed is None:
-                    mut_bed = pd.read_csv(rec_bed, sep = '\t', names = ['chrom', 'start', 'end', 'rate'], dtype = {'chrom':str, 'start':int, 'end':int, 'rate':float})
-                    loop_rec = mut_bed.iterrows()
-                    row_mut = next(loop_rec)[1]
+                    mut_bed = pd.read_csv(mut_bed, sep = '\t', names = ['chr', 'start', 'end', 'rate'], dtype = {'chr':str, 'start':int, 'end':int, 'rate':float})
+                    loop_mut= mut_bed.iterrows()
+                    row_mut = next(loop_mut)[1]
                     if filter_depth is False:
                         for line in data:
                             (
@@ -258,15 +258,15 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             g_0 = float(g0)
                             g_1 = float(g1)
                             #window = ceil(int(pos) / window_size) - 1
-                            while row_rec.chrom != chrom:
+                            while row_rec.chr != chrom:
                                 row_rec = next(loop_rec)[1]
                             while row_rec.end < int(pos):
                                 row_rec = next(loop_rec)[1]
-                            while row_mut.chrom != chrom:
+                            while row_mut.chr != chrom:
                                 row_mut = next(loop_rec)[1]
                             while row_mut.end < int(pos):
                                 row_mut = next(loop_rec)[1]
-                            window = row.window
+                            window = row_rec.window
                             m[chrom].append(row_mut.rate)
                             gl["g_0"][chrom][window].append(g_0)
                             gl["g_1"][chrom][window].append(g_1)
@@ -287,15 +287,15 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                                 g_0 = float(g0)
                                 g_1 = float(g1)
                                 #window = ceil(int(pos) / window_size) - 1
-                                while row.chrom != chrom:
-                                    row = next(loop_rec)[1]
-                                while row.end < int(pos):
-                                    row = next(loop_rec)[1]
-                                while row_mut.chrom != chrom:
-                                    row_mut = next(loop_rec)[1]
+                                while row_rec.chr != chrom:
+                                    row_rec = next(loop_rec)[1]
+                                while row_rec.end < int(pos):
+                                    row_rec = next(loop_rec)[1]
+                                while row_mut.chr != chrom:
+                                    row_mut = next(loop_mut)[1]
                                 while row_mut.end < int(pos):
-                                    row_mut = next(loop_rec)[1]
-                                window = row.window
+                                    row_mut = next(loop_mut)[1]
+                                window = row_rec.window
                                 m[chrom].append(row_mut.rate)
                                 gl["g_0"][chrom][window].append(g_0)
                                 gl["g_1"][chrom][window].append(g_1)
@@ -317,7 +317,7 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                                 row_rec = next(loop_rec)[1]
                             while row_rec.end < int(pos):
                                 row_rec = next(loop_rec)[1]
-                            window = row.window
+                            window = row_rec.window
                             m[chrom].append(1)
                             gl["g_0"][chrom][window].append(g_0)
                             gl["g_1"][chrom][window].append(g_1)

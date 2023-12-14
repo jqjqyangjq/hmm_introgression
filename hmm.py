@@ -388,7 +388,7 @@ def TrainModel(raw_obs, chr_index, w, pars, post_file, not_est_trans, m_rates,
     #return pars, Z, E, PG, SNP, GLL, SNP2BIN    # all arrays must be same length
     return pars
 
-def decode_from_params(raw_obs, chr_index, w, obs_count, pars, post_file, m_rates, window_size = 1000,):
+def decode_from_params(raw_obs, chr_index, w, pars, post_file, m_rates, window_size = 1000,):
     n_chr = len(chr_index)
     n_states = len(pars.starting_probabilities)
     n_windows = np.ones(n_chr)

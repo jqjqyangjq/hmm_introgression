@@ -49,6 +49,9 @@ def main():
     
     decode_subparser = subparser.add_parser('decode', help='Decode posterior from params trained')
     decode_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage", default = False)
+    decode_subparser.add_argument("-rec", action='store_true', help = "binning genome by genetic length, default False. rec map in bed format required",  default = False)
+    decode_subparser.add_argument("-rec_map", metavar='',
+                                 help="recombination map in bed format (interpolated)", type=str, default=None)
     decode_subparser.add_argument("-gll_file", metavar='', 
                                  help="[required] gll file taken deam into account", type=str, required = True)
     decode_subparser.add_argument("-mut_file", metavar='',
@@ -166,9 +169,22 @@ def main():
                 print(f"posterior file: {args.posterior}", file = log_file)
                 log_file.write(f"window size: {args.window_size}\n")
                 log_file.write(f"filter depth: {args.filter_depth}\n")
-                log_file.write(f"max depth: {args.maximum_dep}\n")
-                log_file.write(f"min depth: {args.minimum_dep}\n")
-            hmm_parameters = read_HMM_parameters_from_file(args.param)
+                if args.filter_depth:
+                    log_file.write(f"max depth: {args.maximum_dep}\n")
+                    log_file.write(f"min depth: {args.minimum_dep}\n")
+                if args.rec:
+                    log_file.write(f"using rec map: {args.rec_map}\n")
+        hmm_parameters = read_HMM_parameters_from_file(args.param)
+        print("decoding")
+        print(f"mut rate file: {args.mut_file}")
+        print(f"posterior file: {args.posterior}")
+        print(f"window size: {args.window_size}\n")
+        print(f"filter depth: {args.filter_depth}\n")
+        if args.filter_depth:
+            print(f"max depth: {args.maximum_dep}\n")
+            print(f"min depth: {args.minimum_dep}\n")
+        if args.rec:
+            print(f"using rec map: {args.rec_map}")
         observation, chrs, windows, m_rates = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep,
         args.rec, args.rec_map, args.mut_file)
         print('-' * 40)
