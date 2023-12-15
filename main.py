@@ -41,6 +41,7 @@ def main():
     train_subparser.add_argument("-rec", action='store_true', help = "binning genome by genetic length, default False. rec map in bed format required",  default = False)
     train_subparser.add_argument("-rec_map", metavar='',
                                  help="recombination map in bed format (interpolated)", type=str, default=None)
+    train_subparser.add_argument("-rec_window_trim", action='store_true', help = "trim the last the end first windows by genetic length",  default = False)
     train_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = None)
     train_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = None)
     train_subparser.add_argument("-not_est_transition",  action='store_true', help = "estimate transition parameter or not", default= False)
@@ -50,6 +51,8 @@ def main():
     decode_subparser = subparser.add_parser('decode', help='Decode posterior from params trained')
     decode_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage", default = False)
     decode_subparser.add_argument("-rec", action='store_true', help = "binning genome by genetic length, default False. rec map in bed format required",  default = False)
+    decode_subparser.add_argument("-rec_window_trim", action='store_true', help = "trim the last the end first windows by genetic length",  default = False)
+
     decode_subparser.add_argument("-rec_map", metavar='',
                                  help="recombination map in bed format (interpolated)", type=str, default=None)
     decode_subparser.add_argument("-gll_file", metavar='', 
