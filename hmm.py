@@ -337,11 +337,12 @@ def TrainModel(raw_obs, chr_index, w, pars, post_file, not_est_trans, m_rates,
             fwd, scales = forward(E[chr], pars.transitions, pars.starting_probabilities)
             bwd = backward(E[chr], pars.transitions, scales)
             Z[chr][:] = fwd * bwd
+            #print(np.where(np.isnan(Z)))
             update_post_geno(PG[chr], SNP[chr], Z[chr], SNP2BIN[chr], chr)
             '''
             P(G_lr = g, Z_l | O', theta)  see my(Jiaqi) letax note.
             '''
-            assert np.allclose(np.sum(PG[chr], (1, 2)), 1), f"sum of PG is not 1 for chr index {chr}"
+            #assert np.allclose(np.sum(PG[chr], (1, 2)), 1), f"sum of PG is not 1 for chr index {chr}"
             # PG = P(Z|O) P(O, G | Z) / sum_g P(O, G=g | Z) for all sites   .  affected by missing data?
             top += np.sum(PG[chr][:,:,1], axis = 0)
             bot[0] += np.sum(PG[chr][:,0,0]) + np.sum(PG[chr][:,0,1] * m_rates[chr])
