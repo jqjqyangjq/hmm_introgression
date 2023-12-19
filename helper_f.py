@@ -344,13 +344,16 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
                                 g_0 = float(g0)
                                 g_1 = float(g1)
-                                #window = ceil(int(pos) / window_size) - 1
-                                while row_rec.chr != chrom:
+                                while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
                                     row_rec = next(loop_rec)[1]
-                                while row_rec.end < int(pos):
-                                    row_rec = next(loop_rec)[1]
-                                if row_rec.start > int(pos):
+                                if row_rec.start > int(pos): # recombination has not started yet. do not record
                                     continue
+                                try :
+                                    while row_rec.end < int(pos):  # pos goes to next recombination interval
+                                        row_rec = next(loop_rec)[1]
+                                except StopIteration:   # recombination already ended. stop recording.
+                                    break
+
                                 window = row_rec.window
                                 m[chrom].append(1)
                                 gl["g_0"][chrom][window].append(g_0)
