@@ -238,6 +238,7 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
         rec_bed = pd.read_csv(rec_bed, sep = '\t', dtype = {'chr':str, 'start':int, 'end':int, 'window':int})
         loop_rec = rec_bed.iterrows()
         row_rec = next(loop_rec)[1]
+        row_rec_ = next(loop_rec)[1]
         if len_ne == 6:
             print(f"loading real data from {gll_file}")
             with gzip.open(gll_file, "rt") as data:
@@ -258,12 +259,17 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             g_0 = float(g0)
                             g_1 = float(g1)
                             #window = ceil(int(pos) / window_size) - 1
-                            while row_rec.chr != chrom:
-                                row_rec = next(loop_rec)[1]
-                            while row_rec.end < int(pos):
-                                row_rec = next(loop_rec)[1] 
-                            if row_rec.start > int(pos):  #first pos(s) not in the recombination map recoreded.
-                                continue   
+                            while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
+                                row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                            if row_rec.start > int(pos): # recombination has not started yet. do not record
+                                continue
+                            try :
+                                while row_rec.end < int(pos):  # pos goes to next recombination interval
+                                    row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                            except row_rec_.chr != chrom:   # recombination at current chromosome ends. do not record anymore
+                                continue   # do not record
+                            except StopIteration:   # whole recombinatino ends. end
+                                break
                             while row_mut.chr != chrom:
                                 row_mut = next(loop_rec)[1]
                             while row_mut.end < int(pos):
@@ -290,12 +296,17 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                                 g_0 = float(g0)
                                 g_1 = float(g1)
                                 #window = ceil(int(pos) / window_size) - 1
-                                while row_rec.chr != chrom:
-                                    row_rec = next(loop_rec)[1]
-                                while row_rec.end < int(pos):
-                                    row_rec = next(loop_rec)[1]
-                                if row_rec.start > int(pos):   #first pos(s) not in the recombination map recoreded.
+                                while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
+                                    row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                                if row_rec.start > int(pos): # recombination has not started yet. do not record
                                     continue
+                                try :
+                                    while row_rec.end < int(pos):  # pos goes to next recombination interval
+                                        row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                                except row_rec_.chr != chrom:   # recombination at current chromosome ends. do not record anymore
+                                    continue   # do not record
+                                except StopIteration:   # whole recombinatino ends. end
+                                    break
                                 while row_mut.chr != chrom:
                                     row_mut = next(loop_mut)[1]
                                 while row_mut.end < int(pos):
@@ -318,12 +329,17 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             g_0 = float(g0)
                             g_1 = float(g1)
                             #window = ceil(int(pos) / window_size) - 1
-                            while row_rec.chr != chrom:
-                                row_rec = next(loop_rec)[1]
-                            while row_rec.end < int(pos):
-                                row_rec = next(loop_rec)[1]
-                            if row_rec.start > int(pos):
+                            while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
+                                row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                            if row_rec.start > int(pos): # recombination has not started yet. do not record
                                 continue
+                            try :
+                                while row_rec.end < int(pos):  # pos goes to next recombination interval
+                                    row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                            except row_rec_.chr != chrom:   # recombination at current chromosome ends. do not record anymore
+                                continue   # do not record
+                            except StopIteration:   # whole recombinatino ends. end
+                                break
                             window = row_rec.window
                             m[chrom].append(1)
                             gl["g_0"][chrom][window].append(g_0)
@@ -345,15 +361,17 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                                 g_0 = float(g0)
                                 g_1 = float(g1)
                                 while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
-                                    row_rec = next(loop_rec)[1]
+                                    row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
                                 if row_rec.start > int(pos): # recombination has not started yet. do not record
                                     continue
                                 try :
                                     while row_rec.end < int(pos):  # pos goes to next recombination interval
-                                        row_rec = next(loop_rec)[1]
-                                except StopIteration:   # recombination already ended. stop recording.
+                                        row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                                except row_rec_.chr != chrom:   # recombination at current chromosome ends. do not record anymore
+                                    continue   # do not record
+                                except StopIteration:   # whole recombinatino ends. end
                                     break
-
+        
                                 window = row_rec.window
                                 m[chrom].append(1)
                                 gl["g_0"][chrom][window].append(g_0)
