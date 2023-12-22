@@ -183,13 +183,24 @@ def get_obs_gt(vcf, fa, out, mask = None):
                             else:
                                 print(chr, pos, anc, dep, 2, A+A, sep = '\t', file = f)
                         elif gt == "1/1":   # homozygous alternative.    anc must be alt
-                            B = BCD.split(',')[0]
+                            B = BCD.split(',')
                             if anc == B:
-                                print(chr, pos, anc, dep, 0, BCD[0]+BCD[0], sep = '\t', file = f)
+                                print(chr, pos, anc, dep, 0, anc+anc, sep = '\t', file = f)
                             else:
-                                print(chr, pos, anc, dep, 2, BCD[0]+BCD[0], sep = '\t', file = f)
+                                print(chr, pos, anc, dep, 2, BCD+BCD, sep = '\t', file = f)
                         elif gt == "0/1":
-                            print(chr, pos, anc, dep, 1, A+BCD[0], sep = '\t',  file = f)
+                            if (anc == A) or (anc == BCD):
+                                print(chr, pos, anc, dep, 1, A+BCD, sep = '\t',  file = f)
+                            else:
+                                print(chr, pos, anc, dep, 2, A+BCD, sep = '\t',  file = f)
+                        elif gt == "1/2":  #must be BCD[0]BCD[1]
+                            B = BCD.split(',')
+                            if A == anc:  
+                                print(chr, pos, anc, dep, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
+                            elif (B[0] == anc) or (B[1] == anc):
+                                print(chr, pos, anc, dep, 1, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
+                            else:
+                                print(chr, pos, anc, dep, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
 
 def get_weights(bedfile, window_size): # return weights from the first window to the last window
     first_window = 0
@@ -242,6 +253,8 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
         if len_ne == 6:
             print(f"loading real data from {gll_file}")
             with gzip.open(gll_file, "rt") as data:
+                # with or without mut_bed
+                # with or without filter_dep
                 if not mut_bed is None:
                     mut_bed = pd.read_csv(mut_bed, sep = '\t', names = ['chr', 'start', 'end', 'rate'], dtype = {'chr':str, 'start':int, 'end':int, 'rate':float})
                     loop_mut= mut_bed.iterrows()
@@ -258,27 +271,45 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             ) = line.strip().split()
                             g_0 = float(g0)
                             g_1 = float(g1)
-                            #window = ceil(int(pos) / window_size) - 1
-                            while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
+                            while row_rec.chr != chrom:  # go to the current chromosome. Chromosomes must be in order.
                                 row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
-                            if row_rec.start > int(pos): # recombination has not started yet. do not record
+                            if row_rec.start > int(pos):  # recombination has not started yet. do not record
                                 continue
-                            try :
-                                while row_rec.end < int(pos):  # pos goes to next recombination interval
-                                    row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
-                            except row_rec_.chr != chrom:   # recombination at current chromosome ends. do not record anymore
-                                continue   # do not record
-                            except StopIteration:   # whole recombinatino ends. end
-                                break
-                            while row_mut.chr != chrom:
-                                row_mut = next(loop_rec)[1]
-                            while row_mut.end < int(pos):
-                                row_mut = next(loop_rec)[1]
-
-                            window = row_rec.window
-                            m[chrom].append(row_mut.rate)
-                            gl["g_0"][chrom][window].append(g_0)
-                            gl["g_1"][chrom][window].append(g_1)
+                            '''
+                            still the same chr, and pos > curret row_rec.start
+                            '''
+                            try:   # row_rec.end < pos...  
+                                while row_rec.end < int(pos):  # pos out of the current recombination interval
+                                    #loop until   row_rec.start(for sure) < pos <= row_rec.end
+                                    if row_rec_.chr == row_rec.chr:
+                                        # still the same chr, and pos > curret row_rec.start
+                                        row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                                    else: # # finished the last interval of the chr, and next inter is next chr, do not record current chr anymore
+                                        break # also break the current for loop
+                                # row_rec.end >= pos  or 
+                                # row_rec.end < pos but row_rec_.chr > row_rec.chr
+                                if row_rec.end >= int(pos):
+                                    while row_mut.chr != chrom:
+                                        row_mut = next(loop_rec)[1]
+                                    while row_mut.end < int(pos):
+                                        row_mut = next(loop_rec)[1]
+                                    window = row_rec.window
+                                    m[chrom].append(row_mut.rate)
+                                    gl["g_0"][chrom][window].append(g_0)
+                                    gl["g_1"][chrom][window].append(g_1)
+                            except StopIteration:  #row_rec_ is the last interval, row_rec is the 2rd last.
+                                row_rec = row_rec_  
+                                if row_rec.end < int(pos):
+                                    break
+                                else:
+                                    while row_mut.chr != chrom:
+                                        row_mut = next(loop_rec)[1]
+                                    while row_mut.end < int(pos):
+                                        row_mut = next(loop_rec)[1]
+                                    window = row_rec.window
+                                    m[chrom].append(row_mut.rate)
+                                    gl["g_0"][chrom][window].append(g_0)
+                                    gl["g_1"][chrom][window].append(g_1)
                     else:
                         assert not (maximum_dep is None), "maximum_dep is not None"
                         assert not (minimum_dep is None), "minimum_dep is not None"
@@ -295,26 +326,45 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
                                 g_0 = float(g0)
                                 g_1 = float(g1)
-                                #window = ceil(int(pos) / window_size) - 1
-                                while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
+                                while row_rec.chr != chrom:  # go to the current chromosome. Chromosomes must be in order.
                                     row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
-                                if row_rec.start > int(pos): # recombination has not started yet. do not record
+                                if row_rec.start > int(pos):  # recombination has not started yet. do not record
                                     continue
-                                try :
-                                    while row_rec.end < int(pos):  # pos goes to next recombination interval
-                                        row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
-                                except row_rec_.chr != chrom:   # recombination at current chromosome ends. do not record anymore
-                                    continue   # do not record
-                                except StopIteration:   # whole recombinatino ends. end
-                                    break
-                                while row_mut.chr != chrom:
-                                    row_mut = next(loop_mut)[1]
-                                while row_mut.end < int(pos):
-                                    row_mut = next(loop_mut)[1]
-                                window = row_rec.window
-                                m[chrom].append(row_mut.rate)
-                                gl["g_0"][chrom][window].append(g_0)
-                                gl["g_1"][chrom][window].append(g_1)
+                                '''
+                                still the same chr, and pos > curret row_rec.start
+                                '''
+                                try:   # row_rec.end < pos...  
+                                    while row_rec.end < int(pos):  # pos out of the current recombination interval
+                                        #loop until   row_rec.start(for sure) < pos <= row_rec.end
+                                        if row_rec_.chr == row_rec.chr:
+                                            # still the same chr, and pos > curret row_rec.start
+                                            row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                                        else: # # finished the last interval of the chr, and next inter is next chr, do not record current chr anymore
+                                            break # also break the current for loop
+                                    # row_rec.end >= pos  or 
+                                    # row_rec.end < pos but row_rec_.chr > row_rec.chr
+                                    if row_rec.end >= int(pos):
+                                        while row_mut.chr != chrom:
+                                            row_mut = next(loop_rec)[1]
+                                        while row_mut.end < int(pos):
+                                            row_mut = next(loop_rec)[1]
+                                        window = row_rec.window
+                                        m[chrom].append(row_mut.rate)
+                                        gl["g_0"][chrom][window].append(g_0)
+                                        gl["g_1"][chrom][window].append(g_1)
+                                except StopIteration:  #row_rec_ is the last interval, row_rec is the 2rd last.
+                                    row_rec = row_rec_  
+                                    if row_rec.end < int(pos):
+                                        break
+                                    else:
+                                        while row_mut.chr != chrom:
+                                            row_mut = next(loop_rec)[1]
+                                        while row_mut.end < int(pos):
+                                            row_mut = next(loop_rec)[1]
+                                        window = row_rec.window
+                                        m[chrom].append(row_mut.rate)
+                                        gl["g_0"][chrom][window].append(g_0)
+                                        gl["g_1"][chrom][window].append(g_1)
                 else: # No mut bed provided. For real data, not mut bed should be provided when tranning parameters
                     if filter_depth is False:
                         for line in data:
@@ -328,22 +378,37 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             ) = line.strip().split()
                             g_0 = float(g0)
                             g_1 = float(g1)
-                            #window = ceil(int(pos) / window_size) - 1
-                            while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
+                            while row_rec.chr != chrom:  # go to the current chromosome. Chromosomes must be in order.
                                 row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
-                            if row_rec.start > int(pos): # recombination has not started yet. do not record
+                            if row_rec.start > int(pos):  # recombination has not started yet. do not record
                                 continue
-                            try :
-                                while row_rec.end < int(pos):  # pos goes to next recombination interval
-                                    row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
-                            except row_rec_.chr != chrom:   # recombination at current chromosome ends. do not record anymore
-                                continue   # do not record
-                            except StopIteration:   # whole recombinatino ends. end
-                                break
-                            window = row_rec.window
-                            m[chrom].append(1)
-                            gl["g_0"][chrom][window].append(g_0)
-                            gl["g_1"][chrom][window].append(g_1)
+                            '''
+                            still the same chr, and pos > curret row_rec.start
+                            '''
+                            try:   # row_rec.end < pos...  
+                                while row_rec.end < int(pos):  # pos out of the current recombination interval
+                                    #loop until   row_rec.start(for sure) < pos <= row_rec.end
+                                    if row_rec_.chr == row_rec.chr:
+                                        # still the same chr, and pos > curret row_rec.start
+                                        row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                                    else: # # finished the last interval of the chr, and next inter is next chr, do not record current chr anymore
+                                        break # also break the current for loop
+                                # row_rec.end >= pos  or 
+                                # row_rec.end < pos but row_rec_.chr > row_rec.chr
+                                if row_rec.end >= int(pos):
+                                    window = row_rec.window
+                                    m[chrom].append(1)
+                                    gl["g_0"][chrom][window].append(g_0)
+                                    gl["g_1"][chrom][window].append(g_1)
+                            except StopIteration:  #row_rec_ is the last interval, row_rec is the 2rd last.
+                                row_rec = row_rec_  
+                                if row_rec.end < int(pos):
+                                    break
+                                else:
+                                    window = row_rec.window
+                                    m[chrom].append(1)
+                                    gl["g_0"][chrom][window].append(g_0)
+                                    gl["g_1"][chrom][window].append(g_1)
                     else:
                         assert not (maximum_dep is None), "maximum_dep is not None"
                         assert not (minimum_dep is None), "minimum_dep is not None"
@@ -360,22 +425,37 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                             if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
                                 g_0 = float(g0)
                                 g_1 = float(g1)
-                                while row_rec.chr != chrom:  # go the the current chromomsome. Chromosomes must be in order.
+                                while row_rec.chr != chrom:  # go to the current chromosome. Chromosomes must be in order.
                                     row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
-                                if row_rec.start > int(pos): # recombination has not started yet. do not record
+                                if row_rec.start > int(pos):  # recombination has not started yet. do not record
                                     continue
-                                try :
-                                    while row_rec.end < int(pos):  # pos goes to next recombination interval
-                                        row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
-                                except row_rec_.chr != chrom:   # recombination at current chromosome ends. do not record anymore
-                                    continue   # do not record
-                                except StopIteration:   # whole recombinatino ends. end
-                                    break
-        
-                                window = row_rec.window
-                                m[chrom].append(1)
-                                gl["g_0"][chrom][window].append(g_0)
-                                gl["g_1"][chrom][window].append(g_1)
+                                '''
+                                still the same chr, and pos > curret row_rec.start
+                                '''
+                                try:   # row_rec.end < pos...  
+                                    while row_rec.end < int(pos):  # pos out of the current recombination interval
+                                        #loop until   row_rec.start(for sure) < pos <= row_rec.end
+                                        if row_rec_.chr == row_rec.chr:
+                                            # still the same chr, and pos > curret row_rec.start
+                                            row_rec, row_rec_ = row_rec_, next(loop_rec)[1]
+                                        else: # # finished the last interval of the chr, and next inter is next chr, do not record current chr anymore
+                                            break # also break the current for loop
+                                    # row_rec.end >= pos  or 
+                                    # row_rec.end < pos but row_rec_.chr > row_rec.chr
+                                    if row_rec.end >= int(pos):
+                                        window = row_rec.window
+                                        m[chrom].append(1)
+                                        gl["g_0"][chrom][window].append(g_0)
+                                        gl["g_1"][chrom][window].append(g_1)
+                                except StopIteration:  #row_rec_ is the last interval, row_rec is the 2rd last.
+                                    row_rec = row_rec_  
+                                    if row_rec.end < int(pos):
+                                        break
+                                    else:
+                                        window = row_rec.window
+                                        m[chrom].append(1)
+                                        gl["g_0"][chrom][window].append(g_0)
+                                        gl["g_1"][chrom][window].append(g_1)
         else:
             print("data format not supported (cuurently not desiged not simulated dataset)")
         obs_chrs = []
@@ -480,7 +560,6 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
         l1 = sum(obs_count_)
         assert l==l1, f"missing part of mut rates for obs in {chrom} chromsome, {l} mut records, {l1} obs records"
     return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), m_rates
-
 
 def load_observations_gt(gt_file, mask_file, window_size, max_variants, data_type, 
 filter_depth, minimum_dep, maximum_dep):  # return number of variants

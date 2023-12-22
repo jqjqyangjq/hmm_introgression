@@ -6,7 +6,7 @@ from hmm import TrainModel, write_HMM_to_file, read_HMM_parameters_from_file, de
 import pandas as pd
 from call import Call
 from hmm_gt import TrainModel_GT
-
+import time
 def main():
     parser = argparse.ArgumentParser(add_help = True)
 
@@ -139,16 +139,19 @@ def main():
             if args.rec is True:
                 log_file.write(f"using rec map: {args.rec_map}\n")
             else:
+                log_file.write(f"using physical length for binning\n")
                 log_file.write(f"window size: {args.window_size}\n")
             log_file.write(f"filter depth: {args.filter_depth}\n")
             log_file.write(f"max depth: {args.maximum_dep}\n")
             log_file.write(f"min depth: {args.minimum_dep}\n")
             log_file.write(f"mut rate file: {args.mut_file}\n")
+        t1 = time.time()
         observation, chrs, windows, m_rates = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep,
         args.rec, args.rec_map, args.mut_file)
+        t2 = time.time()
+        print(f"loading time: {t2 - t1}")
         print('-' * 40)
-        print('> Output is',args.out) 
-        print('> Window size is',args.window_size, 'bp') 
+        print('> Output is',args.out)
         print('-' * 40)
         hmm_parameters = TrainModel(raw_obs = observation,
                                  chr_index = chrs,
@@ -188,8 +191,11 @@ def main():
             print(f"min depth: {args.minimum_dep}\n")
         if args.rec:
             print(f"using rec map: {args.rec_map}")
+        t1 = time.time()
         observation, chrs, windows, m_rates = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep,
         args.rec, args.rec_map, args.mut_file)
+        t2 = time.time()
+        print(f"loading time: {t2 - t1}")
         print('-' * 40)
         print(hmm_parameters)
         print('> Window size is',args.window_size, 'bp') 
@@ -209,6 +215,7 @@ def main():
         hmm_parameters = read_HMM_parameters_from_file(args.param)
         print(args.param)
         #print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
+        t1 = time.time()
         if args.data_type == "modern":
             print(f"loading snp-only input data {args.count_file} with modern mask {args.mask_file}, with window size {args.window_size}")
             print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
@@ -218,7 +225,8 @@ def main():
             print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
             chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, args.mask_file, args.window_size, args.max_variants_per_window, "ancient", args.filter_depth, args.minimum_dep, args.maximum_dep)
         #check for zero:
-
+        t2 = time.time()
+        print(f"loading time: {t2 - t1}")
         print(f"finished loading {args.count_file}")
         print(f"finished loading {args.mask_file}")
         print('-' * 40)
