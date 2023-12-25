@@ -290,9 +290,9 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                                 # row_rec.end < pos but row_rec_.chr > row_rec.chr
                                 if row_rec.end >= int(pos):
                                     while row_mut.chr != chrom:
-                                        row_mut = next(loop_rec)[1]
+                                        row_mut = next(loop_mut)[1]
                                     while row_mut.end < int(pos):
-                                        row_mut = next(loop_rec)[1]
+                                        row_mut = next(loop_mut)[1]
                                     window = row_rec.window
                                     m[chrom].append(row_mut.rate)
                                     gl["g_0"][chrom][window].append(g_0)
@@ -303,9 +303,9 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                                     break
                                 else:
                                     while row_mut.chr != chrom:
-                                        row_mut = next(loop_rec)[1]
+                                        row_mut = next(loop_mut)[1]
                                     while row_mut.end < int(pos):
-                                        row_mut = next(loop_rec)[1]
+                                        row_mut = next(loop_mut)[1]
                                     window = row_rec.window
                                     m[chrom].append(row_mut.rate)
                                     gl["g_0"][chrom][window].append(g_0)
@@ -345,9 +345,9 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                                     # row_rec.end < pos but row_rec_.chr > row_rec.chr
                                     if row_rec.end >= int(pos):
                                         while row_mut.chr != chrom:
-                                            row_mut = next(loop_rec)[1]
+                                            row_mut = next(loop_mut)[1]
                                         while row_mut.end < int(pos):
-                                            row_mut = next(loop_rec)[1]
+                                            row_mut = next(loop_mut)[1]
                                         window = row_rec.window
                                         m[chrom].append(row_mut.rate)
                                         gl["g_0"][chrom][window].append(g_0)
@@ -358,9 +358,9 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
                                         break
                                     else:
                                         while row_mut.chr != chrom:
-                                            row_mut = next(loop_rec)[1]
+                                            row_mut = next(loop_mut)[1]
                                         while row_mut.end < int(pos):
-                                            row_mut = next(loop_rec)[1]
+                                            row_mut = next(loop_mut)[1]
                                         window = row_rec.window
                                         m[chrom].append(row_mut.rate)
                                         gl["g_0"][chrom][window].append(g_0)

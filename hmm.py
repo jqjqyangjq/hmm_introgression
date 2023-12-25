@@ -12,8 +12,10 @@ from helper_f import load_observations, get_mut_rates
 def snp2bin_scale(e_out, e_in, ix, scale):    
     scale[:] = 0
     for i, row in enumerate(ix):
+        if np.max(e_out[row]) > 1e250:   # goes to next bin 
+            continue
         e_out[row] *= e_in[i]    # this is where numeric underflow happens
-        while np.log(np.min(e_out[row])) < -1:   # if e_out[row] underflows.
+        while np.log(np.min(e_out[row])) < -250:   # if e_out[row] underflows.
             e_out[row] *= np.exp(1)
             scale[row] += 1        
 
