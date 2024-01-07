@@ -6,7 +6,7 @@ import json
 from math import exp, ceil
 
 
-from helper_f import load_observations, get_mut_rates
+from helper_f import load_observations
 
 @njit
 def snp2bin_scale(e_out, e_in, ix, scale):    

@@ -36,14 +36,14 @@ def main():
                                  help="output of posterior from fwd-bwd", default = "Posterior.txt")
     train_subparser.add_argument("-log_file", metavar='',
                                  help="output log info of baum-welch", default = "EM_iterration.log")
-    train_subparser.add_argument("-iteration", metavar='', help = "max iteration for EM", type = int, default = 1000)
+    train_subparser.add_argument("-iteration", metavar='', help = "max iteration for EM", type = int, default = 2000)
     train_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage",  default = False)
     train_subparser.add_argument("-rec", action='store_true', help = "binning genome by genetic length, default False. rec map in bed format required",  default = False)
     train_subparser.add_argument("-rec_map", metavar='',
                                  help="recombination map in bed format (interpolated)", type=str, default=None)
     train_subparser.add_argument("-rec_window_trim", action='store_true', help = "trim the last the end first windows by genetic length",  default = False)
-    train_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = None)
-    train_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = None)
+    train_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = 150)
+    train_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = 0)
     train_subparser.add_argument("-not_est_transition",  action='store_true', help = "estimate transition parameter or not", default= False)
     train_subparser.add_argument("-transition_1", metavar='',  help = "transition_param_1", default= None, type=float)
     train_subparser.add_argument("-transition_2", metavar='',  help = "transition_param_2", default= None, type=float)
@@ -76,7 +76,7 @@ def main():
     train_gt_subparser.add_argument("-count_file", metavar='', 
                                  help="[required] count of derived alleles", type=str, required = True)
     train_gt_subparser.add_argument("-max_variants_per_window", metavar='',
-                                 help="maximum number of variants per window allowed", type=int, default = 20)
+                                 help="maximum number of variants per window allowed", type=int, default = 50)
     train_gt_subparser.add_argument("-filter_depth", action='store_true', help = "whetther set a uniform filter on coverage",  default = False)
     train_gt_subparser.add_argument("-maximum_dep", metavar='', help = "max depth for per position", type = int, default = 0)
     train_gt_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = 200)
@@ -135,6 +135,8 @@ def main():
         print(f"fixed transition parameters: {args.not_est_transition}")
         print(args.param)
         with open(args.log_file, 'w') as log_file:
+            log_file.write(f"gll mode\n")
+            log_file.write(f"input_file {args.gll_file}\n")
             log_file.write(f"fixed transition parameters: {args.not_est_transition}\n")
             if args.rec is True:
                 log_file.write(f"using rec map: {args.rec_map}\n")
@@ -170,9 +172,10 @@ def main():
             return
         if not args.log_file is None:
             with open(args.log_file, 'a') as log_file:
-                print("decoding", file = log_file)
+                print("decoding, gll", file = log_file)
                 print(f"mut rate file: {args.mut_file}", file = log_file)
                 print(f"posterior file: {args.posterior}", file = log_file)
+                print(f"input file: {args.gll_file}", file = log_file)
                 log_file.write(f"window size: {args.window_size}\n")
                 log_file.write(f"filter depth: {args.filter_depth}\n")
                 if args.filter_depth:
@@ -216,14 +219,11 @@ def main():
         print(args.param)
         #print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
         t1 = time.time()
-        if args.data_type == "modern":
-            print(f"loading snp-only input data {args.count_file} with modern mask {args.mask_file}, with window size {args.window_size}")
-            print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
-            chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, args.mask_file, args.window_size, args.max_variants_per_window, "modern", args.filter_depth, args.minimum_dep, args.maximum_dep)
-        if args.data_type == "ancient":
-            print(f"loading all-pos input data {args.count_file} with ancient per-individual mask {args.mask_file}, with window size {args.window_size}")
-            print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
-            chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, args.mask_file, args.window_size, args.max_variants_per_window, "ancient", args.filter_depth, args.minimum_dep, args.maximum_dep)
+
+        print(f"loading input data {args.count_file} with {args.data_type} mask {args.mask_file}, with window size {args.window_size}")
+        print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
+        chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, 
+        args.mask_file, args.window_size, args.max_variants_per_window, args.data_type, args.filter_depth, args.minimum_dep, args.maximum_dep, args.mut_file)
         #check for zero:
         t2 = time.time()
         print(f"loading time: {t2 - t1}")
@@ -235,6 +235,8 @@ def main():
         print('> Window size is',args.window_size, 'bp') 
         print('-' * 40)
         with open(args.log_file, 'w') as log_file:
+            log_file.write(f"gt mode\n")
+            log_file.write(f"input_file {args.count_file}\n")
             log_file.write(f"{hmm_parameters}\n")
             log_file.write(f"maximum number of variants per window allowed is {args.max_variants_per_window}\n")
             log_file.write(f"output file: {args.out}\n")
@@ -256,7 +258,6 @@ def main():
                                 post_file= args.posterior,
                                 log_file = args.log_file,
                                 hmm_parameters = hmm_parameters,
-                                m_rates_file = args.mut_file,
                                 maxiterations=args.iteration)
         write_HMM_to_file(hmm_parameters, args.out)     
 

@@ -6,7 +6,7 @@ import json
 from math import exp, ceil
 import os 
 import gzip
-
+"""
 def get_mut_rates(mut_full, window_size, windows, obs_count, chr):
     '''
     window: window index
@@ -82,7 +82,7 @@ def get_mut_rates_gt(mut_full, window_size, w, chr):
             break
     print("mut rates load done") 
     return np.array(mut)
-
+"""
 def load_fasta(fasta_file):
     '''
     Read a fasta file with a single chromosome in and return the sequence as a string
@@ -202,9 +202,10 @@ def get_obs_gt(vcf, fa, out, mask = None):
                             else:
                                 print(chr, pos, anc, dep, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
 
-def get_weights(bedfile, window_size): # return weights from the first window to the last window
+def get_weights(bedfile, window_size, mut_bed): # return weights from the first window to the last window
     first_window = 0
     last_window = 0
+    window_size = int(window_size)
     weights = defaultdict(lambda: defaultdict(float))
     with open(f"{bedfile}") as data:
         print(f"loading mask file {bedfile}")
@@ -226,7 +227,20 @@ def get_weights(bedfile, window_size): # return weights from the first window to
                     
                 else:    # e.g. start window 1, end window 2
                     weights[chr][start_window + 1] += (end - end_window * window_size) / window_size
-        return weights
+        if mut_bed is None:
+            # No mut file is provided
+            return weights
+        else:
+            mut = pd.read_csv(mut_bed, names = ['chr', 'start', 'end', 'rate'], dtype = {'chr':str, 'start':int, 'end':int, 'rate':float}, sep='\s+') 
+            for chr in list(weights.keys()):
+                mut_chr = mut[mut['chr'] == chr].reset_index(drop = True)
+                mut_loop = mut_chr.iterrows()
+                mut_row = next(mut_loop)[1]
+                for window in list(weights[chr].keys()):
+                    while mut_row.end < window * window_size:  # 100 000 - 101 000
+                        mut_row = next(mut_loop)[1]
+                    weights[chr][window] *= mut_row.rate
+            return weights
 
 def load_observations(gll_file, window_size=1000, filter_depth = False, maximum_dep = None, minimum_dep = None, 
 rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
@@ -562,7 +576,7 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
     return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), m_rates
 
 def load_observations_gt(gt_file, mask_file, window_size, max_variants, data_type, 
-filter_depth, minimum_dep, maximum_dep):  # return number of variants
+filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
     chr = []
     chr_index = []  #chrs
     windows = []
@@ -572,7 +586,7 @@ filter_depth, minimum_dep, maximum_dep):  # return number of variants
     # assuming full length 100M
     window_all = []
 
-    call = get_weights(mask_file, window_size)
+    call = get_weights(mask_file, window_size, mut_bed)
 
     for chr in list(call.keys()):
         first_w = list(call[chr].keys())[0]  # the first window callable

@@ -1,4 +1,4 @@
-from helper_f import load_observations, get_mut_rates, get_mut_rates_gt
+from helper_f import load_observations
 from collections import defaultdict
 import pandas as pd
 import numpy as np
@@ -114,18 +114,18 @@ def logoutput(pars, loglikelihood, iteration, log_file):
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-def Emission_probs_poisson(emissions, observations, weights, mutrates):
+def Emission_probs_poisson(emissions, observations, weights):
     n = len(observations)
     n_states = len(emissions)
     
     # observations values
     fractorials = np.zeros(n)
     for i, obs in enumerate(observations):
-        fractorials[i] = factorial(obs)
+        fractorials[i] = factorial(int(obs))
 
     probabilities = np.zeros( (n, n_states) ) 
     for state in range(n_states): 
-        probabilities[:,state] = (np.exp( - emissions[state] * weights * mutrates) *  ((emissions[state] * weights * mutrates )**observations )) / fractorials
+        probabilities[:,state] = (np.exp( - emissions[state] * weights) *  ((emissions[state] * weights )**observations )) / fractorials
 
     return probabilities
 
@@ -167,16 +167,7 @@ def backward(emissions, transitions, scales):
     return beta
 
 
-def GetProbability(hmm_parameters, weights, obs, mutrates):
-
-    emissions = Emission_probs_poisson(hmm_parameters.emissions, obs, weights, mutrates)
-    _, scales = forward(emissions, hmm_parameters.transitions, hmm_parameters.starting_probabilities)
-    forward_probility_of_obs = np.sum(np.log(scales))
-
-    return forward_probility_of_obs
-
-
-def TrainModel_GT(hmm_parameters, weights, obs, m_rates_file, chr_index, call_index, post_file, log_file, w, maxiterations = 1000, epsilon = 0.0001, window_size = 1000):  # w window index
+def TrainModel_GT(hmm_parameters, weights, obs, chr_index, call_index, post_file, log_file, w, maxiterations = 1000, epsilon = 0.0001, window_size = 1000):  # w window index
     """
     Trains the model once, using the forward-backward algorithm. 
     chr_index, weights, obs, call_index, w
@@ -186,26 +177,12 @@ def TrainModel_GT(hmm_parameters, weights, obs, m_rates_file, chr_index, call_in
     n_states = len(hmm_parameters.starting_probabilities)
     Z = []
     E = []
-    m_rates = []
-    if not m_rates_file is None:
-        m_rates_full = pd.read_csv(m_rates_file, sep = '\t', 
-                               header = None, names = ["chrom", "start", "end", "mut_rate"],
-                               dtype = {"chrom": str, "start": int, "end": int, "mut_rate": float})
-    print(f"mut file: {m_rates_file}")
     for chr in range(n_chr):
         n_windows[chr] = w[chr][-1] - w[chr][0] + 1
         n_windows_ = round(n_windows[chr])
         Z_ = np.zeros((n_windows_, n_states))  # P(Z | O)
         E_ = np.ones((n_windows_, n_states))  # P(O | Z)
         Z.append(Z_)
-        if m_rates_file is None:
-            m_rates_ = np.ones(n_windows_)
-            print("using uniform mutation rates")
-        else:
-            print(f"loading mut rates for {chr_index[chr]}")
-            m_rates_ = get_mut_rates_gt(m_rates_full, window_size, w[chr], str(chr_index[chr]))
-        m_rates.append(m_rates_)
-        assert len(m_rates_) == n_windows_, f"missing part of mutation rates for obs in chromosome {chr_index[chr]}, mut_len {len(m_rates_)} vs window_len {n_windows_}"
     previous_ll = -np.inf
     for iteration in range(maxiterations):
         new_emissions_matrix = np.zeros((n_states))
@@ -215,17 +192,17 @@ def TrainModel_GT(hmm_parameters, weights, obs, m_rates_file, chr_index, call_in
         new_ll = 0
         normalize = []
         for chr in range(n_chr):
-            emissions = Emission_probs_poisson(hmm_parameters.emissions, obs[chr], weights[chr], m_rates[chr])
+            emissions = Emission_probs_poisson(hmm_parameters.emissions, obs[chr], weights[chr])
             forward_probs, scales = forward(emissions, hmm_parameters.transitions, hmm_parameters.starting_probabilities)
             backward_probs = backward(emissions, hmm_parameters.transitions, scales)
             new_ll += np.sum(np.log(scales))
 
             # Update emission, use only called_snpns
             top[0] += np.sum(forward_probs[[call_index[chr]], 0] * backward_probs[[call_index[chr]], 0] * obs[chr][call_index[chr]])
-            bot[0] += np.sum(forward_probs[[call_index[chr]], 0] * backward_probs[[call_index[chr]], 0] * (weights[chr][call_index[chr]] * m_rates[chr][call_index[chr]]) )
+            bot[0] += np.sum(forward_probs[[call_index[chr]], 0] * backward_probs[[call_index[chr]], 0] * (weights[chr][call_index[chr]]) )
             
             top[1] += np.sum(forward_probs[[call_index[chr]], 1] * backward_probs[[call_index[chr]], 1] * obs[chr][call_index[chr]])
-            bot[1] += np.sum(forward_probs[[call_index[chr]], 1] * backward_probs[[call_index[chr]], 1] * (weights[chr][call_index[chr]] * m_rates[chr][call_index[chr]]) )
+            bot[1] += np.sum(forward_probs[[call_index[chr]], 1] * backward_probs[[call_index[chr]], 1] * (weights[chr][call_index[chr]]) )
             # Update starting probs
             Z[chr][:] = forward_probs * backward_probs 
             normalize.append(np.sum(Z[chr], axis = 0))      # sum over posterior across chrs
