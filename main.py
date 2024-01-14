@@ -82,6 +82,8 @@ def main():
     train_gt_subparser.add_argument("-minimum_dep", metavar='', help = "min depth for per position", type = int, default = 200)
     train_gt_subparser.add_argument("-mask_file", metavar='',
                                  help="file with integrated mask", type=str, default=None)
+    train_gt_subparser.add_argument("-rec_map", metavar='',
+                                 help="rec_map, indexed by windows", type=str, default=None)
     train_gt_subparser.add_argument("-mut_file", metavar='',
                                  help="file with mutation rates (default is mutation rate is uniform)", type=str, default=None)
     train_gt_subparser.add_argument("-param", metavar='',
@@ -127,9 +129,9 @@ def main():
             return
         hmm_parameters = read_HMM_parameters_from_file(args.param)
         if args.transition_1 is not None:
-            hmm_parameters[0] = [1- args.transition_1, args.transition_1]
+            hmm_parameters.transitions[0] = [1-args.transition_1, args.transition_1]
         if args.transition_2 is not None:
-            hmm_parameters[1] = [args.transition_2, 1 - args.transition_2]
+            hmm_parameters.transitions[1] = [args.transition_2, 1-args.transition_2]
         print(hmm_parameters)
         print(f"filter depth: {args.filter_depth}")
         print(f"fixed transition parameters: {args.not_est_transition}")
@@ -148,8 +150,7 @@ def main():
             log_file.write(f"min depth: {args.minimum_dep}\n")
             log_file.write(f"mut rate file: {args.mut_file}\n")
         t1 = time.time()
-        observation, chrs, windows, m_rates = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep,
-        args.rec, args.rec_map, args.mut_file)
+        observation, chrs, windows, m_rates = load_observations(args.gll_file, args.window_size, args.filter_depth, args.maximum_dep, args.minimum_dep, args.rec_map, args.mut_file)
         t2 = time.time()
         print(f"loading time: {t2 - t1}")
         print('-' * 40)
@@ -176,6 +177,7 @@ def main():
                 print(f"mut rate file: {args.mut_file}", file = log_file)
                 print(f"posterior file: {args.posterior}", file = log_file)
                 print(f"input file: {args.gll_file}", file = log_file)
+                print(f"parameter file: {args.param}\n", file = log_file)
                 log_file.write(f"window size: {args.window_size}\n")
                 log_file.write(f"filter depth: {args.filter_depth}\n")
                 if args.filter_depth:
@@ -222,8 +224,8 @@ def main():
 
         print(f"loading input data {args.count_file} with {args.data_type} mask {args.mask_file}, with window size {args.window_size}")
         print(f"maximum number of variants per window allowed is {args.max_variants_per_window}")
-        chr_index, weights, obs, call_index, w = load_observations_gt(args.count_file, 
-        args.mask_file, args.window_size, args.max_variants_per_window, args.data_type, args.filter_depth, args.minimum_dep, args.maximum_dep, args.mut_file)
+        chr_index, weights, obs, call_index, w, rec = load_observations_gt(args.count_file, 
+        args.mask_file, args.window_size, args.max_variants_per_window, args.data_type, args.rec_map, args.filter_depth, args.minimum_dep, args.maximum_dep, args.mut_file)
         #check for zero:
         t2 = time.time()
         print(f"loading time: {t2 - t1}")
@@ -236,6 +238,7 @@ def main():
         print('-' * 40)
         with open(args.log_file, 'w') as log_file:
             log_file.write(f"gt mode\n")
+            log_file.write(f"input type {args.data_type}\n")
             log_file.write(f"input_file {args.count_file}\n")
             log_file.write(f"{hmm_parameters}\n")
             log_file.write(f"maximum number of variants per window allowed is {args.max_variants_per_window}\n")
@@ -257,6 +260,7 @@ def main():
                                 call_index= call_index,
                                 post_file= args.posterior,
                                 log_file = args.log_file,
+                                rec = rec,
                                 hmm_parameters = hmm_parameters,
                                 maxiterations=args.iteration)
         write_HMM_to_file(hmm_parameters, args.out)     

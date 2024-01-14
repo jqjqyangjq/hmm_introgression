@@ -167,7 +167,7 @@ def backward(emissions, transitions, scales):
     return beta
 
 
-def TrainModel_GT(hmm_parameters, weights, obs, chr_index, call_index, post_file, log_file, w, maxiterations = 1000, epsilon = 0.0001, window_size = 1000):  # w window index
+def TrainModel_GT(hmm_parameters, weights, obs, chr_index, call_index, post_file, log_file, rec, w, maxiterations = 1000, epsilon = 0.0001, window_size = 1000,):  # w window index
     """
     Trains the model once, using the forward-backward algorithm. 
     chr_index, weights, obs, call_index, w
@@ -220,11 +220,19 @@ def TrainModel_GT(hmm_parameters, weights, obs, chr_index, call_index, post_file
             new_starting_probabilities,
             new_trans,
             new_emissions_matrix
-        )  
+        )
         logoutput(hmm_parameters, new_ll, iteration, log_file)
         if (new_ll - previous_ll < epsilon):
+            if not rec:
+                #not taking into account recombination rates    
+                break
+            else:
+                """
+                new_trans[0] = 
+                """
+        if rec:
+            #scale transition paramters to account for local recombination rates
             break
-        
         previous_ll = new_ll
     
     write_post_to_file(Z, chr_index, w, post_file)

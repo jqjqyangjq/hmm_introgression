@@ -6,7 +6,6 @@ import json
 from math import exp, ceil
 import os 
 import gzip
-"""
 def get_mut_rates(mut_full, window_size, windows, obs_count, chr):
     '''
     window: window index
@@ -46,6 +45,7 @@ def get_mut_rates(mut_full, window_size, windows, obs_count, chr):
     '''
     seems to load correctly. checked.
     '''
+"""
 def get_mut_rates_gt(mut_full, window_size, w, chr):
     '''
     window: window index
@@ -575,7 +575,7 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
         assert l==l1, f"missing part of mut rates for obs in {chrom} chromsome, {l} mut records, {l1} obs records"
     return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), m_rates
 
-def load_observations_gt(gt_file, mask_file, window_size, max_variants, data_type, 
+def load_observations_gt(gt_file, mask_file, window_size, max_variants, data_type, rec_map,
 filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
     chr = []
     chr_index = []  #chrs
@@ -587,22 +587,29 @@ filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
     window_all = []
 
     call = get_weights(mask_file, window_size, mut_bed)
-
+    rec = []
+    if not rec_map is None:
+        rec_map = pd.read_csv(rec_map, sep = '\t', names = ['chr', 'start', 'end', 'rate'], dtype = {'chr':str, 'start':int, 'end':int, 'rate':float})
+        rec_map['bin'] = rec_map['start'] / 1000
+        rec_map['bin'] = rec_map['bin'].astype(int)
+        rec_map['rate'] = rec_map['rate'] + 1e-8
+        #rec_map['rate'] = 0.001  #test constant
     for chr in list(call.keys()):
         first_w = list(call[chr].keys())[0]  # the first window callable
         last_w = list(call[chr].keys())[-1]  # the last window callable
-        
         weights_ = np.zeros(last_w - first_w + 1)
+        if not rec_map is None:
+            rec_map_ = rec_map[(rec_map['chr']==chr) & (rec_map['bin'] >=first_w) & (rec_map['bin'] <= last_w)]
+            rec.append(rec_map_['rate'].to_list())
+           # [0,1,3,5,...]   bins with data, count from the first bin with data.
         call_index_ = []
-        
         for i in list(call[chr].keys()):   # loop through all windows with data
             i = int(i)
             call_index_.append(i - first_w)
         for w in range(first_w, last_w+1):
             weights_[w-first_w] = call[chr][w]
-        weights.append(weights_)              #
-        
-        call_index.append(call_index_)    # [0,1,3,5,...]   bins with data, count from the first bin with data.
+        weights.append(weights_)
+        call_index.append(call_index_) #
     snp = defaultdict(lambda:defaultdict(int))
     if gt_file.endswith(".gz"):
         if data_type == "ancient":
@@ -658,8 +665,7 @@ filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
             #assert weights[int(chr)-1][window-first_w] >0 , f"weights for window {window} is 0 but there are derived in this window."
 
         obs.append(snps)
-    return chr_index, weights, obs, call_index, window_all
-
+    return chr_index, weights, obs, call_index, window_all, rec
 
 """
 I am lazy, so I directly calculate mutation rate either from simulation or from empirical data.
