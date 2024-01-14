@@ -206,13 +206,17 @@ def TrainModel_GT(hmm_parameters, weights, obs, chr_index, call_index, post_file
             # Update starting probs
             Z[chr][:] = forward_probs * backward_probs 
             normalize.append(np.sum(Z[chr], axis = 0))      # sum over posterior across chrs
-            # Update Transition probs 
-            for state1 in range(n_states):
-                for state2 in range(n_states):
-                    new_trans_[chr][state1, state2] = np.sum( forward_probs[:-1,state1]  * hmm_parameters.transitions[state1, state2] * emissions[1:,state2] * backward_probs[1:,state2] / scales[1:] )
+            # Update Transition probs
+            if not not_est_trans:
+                for state1 in range(n_states):
+                    for state2 in range(n_states):
+                        new_trans_[chr][state1, state2] = np.sum( forward_probs[:-1,state1]  * hmm_parameters.transitions[state1, state2] * emissions[1:,state2] * backward_probs[1:,state2] / scales[1:] )
         new_emissions_matrix = top/bot
-        new_trans = np.sum(new_trans_, 0)
-        new_trans /= new_trans.sum(axis=1)[:, np.newaxis] #Ben/Laurits
+        if not not_est_trans:
+            new_trans = np.sum(new_trans_, 0)
+            new_trans /= new_trans.sum(axis=1)[:, np.newaxis] #Ben/Laurits
+        else:
+            new_trans = hmm_parameters.transitions # do not change
         normalize = np.sum(normalize, axis = 0)
         new_starting_probabilities = normalize/np.sum(normalize, axis=0) 
         hmm_parameters = HMMParam(

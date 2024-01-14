@@ -73,6 +73,9 @@ def main():
     train_gt_subparser = subparser.add_parser('gt_mode', help='Train HMM')
     train_gt_subparser.add_argument("-data_type", metavar='',help="[required] data type: modern genotypes or ancient genotyes", type=str, default = "ancient")
 
+    train_gt_subparser.add_argument("-not_est_transition",  action='store_true', help = "estimate transition parameter or not", default= False)
+    train_gt_subparser.add_argument("-transition_1", metavar='',  help = "transition_param_1", default= None, type=float)
+    train_gt_subparser.add_argument("-transition_2", metavar='',  help = "transition_param_2", default= None, type=float)
     train_gt_subparser.add_argument("-count_file", metavar='', 
                                  help="[required] count of derived alleles", type=str, required = True)
     train_gt_subparser.add_argument("-max_variants_per_window", metavar='',
@@ -233,6 +236,10 @@ def main():
         print(f"finished loading {args.mask_file}")
         print('-' * 40)
         print(hmm_parameters)
+        if args.transition_1 is not None:
+            hmm_parameters.transitions[0] = [1-args.transition_1, args.transition_1]
+        if args.transition_2 is not None:
+            hmm_parameters.transitions[1] = [args.transition_2, 1-args.transition_2]
         print('> Output is',args.out) 
         print('> Window size is',args.window_size, 'bp') 
         print('-' * 40)
