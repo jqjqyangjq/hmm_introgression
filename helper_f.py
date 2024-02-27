@@ -163,45 +163,84 @@ def get_obs_gll(vcf, fa, out, mask = None):
                             GLs['GT'], GLs['TG']]), 
                             file = f, sep = '\t')
 
-def get_obs_gt(vcf, fa, out, mask = None):
-    s = f"zcat {vcf}"
-    if not mask is None:
-        s = f"bcftools view -R {mask} {vcf}"
+def get_obs_gt(vcf, fa, out, mask = None, vcf_type = "ancient", ind = None):
+    if ind is None:
+        s = f"zcat {vcf}"
+        if not mask is None:
+            s = f"bcftools view -R {mask} {vcf}"
+    else:
+        s = f"bcftools view -s {ind} -a {vcf}  "
+        if not mask is None:
+            s = f"bcftools view -R {mask} -s {ind} -a {vcf}"
     with open(out, 'w') as f:
         fa = load_fasta(fa)
-        for line in os.popen(s):
-            if not line.startswith("#"):
-                chr, pos, _, A, BCD, _, _, _, _, info = line.strip().split()    # A, ref
-                if A != "ACGT" :
-                    pos = int(pos)
-                    anc = fa[pos-1]
-                    if anc in "ACGT":
-                        gt, dep = info.split(':')[0:2]
-                        if gt == "0/0":    #   homozygous reference, BCD = '.'
-                            if anc == A:
-                                print(chr, pos, anc, dep, 0, A+A, sep = '\t', file = f)
-                            else:
-                                print(chr, pos, anc, dep, 2, A+A, sep = '\t', file = f)
-                        elif gt == "1/1":   # homozygous alternative.    anc must be alt
-                            B = BCD.split(',')
-                            if anc == B:
-                                print(chr, pos, anc, dep, 0, anc+anc, sep = '\t', file = f)
-                            else:
-                                print(chr, pos, anc, dep, 2, BCD+BCD, sep = '\t', file = f)
-                        elif gt == "0/1":
-                            if (anc == A) or (anc == BCD):
-                                print(chr, pos, anc, dep, 1, A+BCD, sep = '\t',  file = f)
-                            else:
-                                print(chr, pos, anc, dep, 2, A+BCD, sep = '\t',  file = f)
-                        elif gt == "1/2":  #must be BCD[0]BCD[1]
-                            B = BCD.split(',')
-                            if A == anc:  
-                                print(chr, pos, anc, dep, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
-                            elif (B[0] == anc) or (B[1] == anc):
-                                print(chr, pos, anc, dep, 1, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
-                            else:
-                                print(chr, pos, anc, dep, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
-
+        if vcf_type == "ancient":
+            for line in os.popen(s):
+                if not line.startswith("#"):
+                    chr, pos, _, A, BCD, _, _, _, _, info = line.strip().split()    # A, ref
+                    if A != "ACGT" :
+                        pos = int(pos)
+                        anc = fa[pos-1]
+                        if anc in "ACGT":
+                            gt, dep = info.split(':')[0:2]
+                            if gt == "0/0":    #   homozygous reference, BCD = '.'
+                                if anc == A:
+                                    print(chr, pos, anc, dep, 0, A+A, sep = '\t', file = f)
+                                else:
+                                    print(chr, pos, anc, dep, 2, A+A, sep = '\t', file = f)
+                            elif gt == "1/1":   # homozygous alternative.    anc must be alt
+                                B = BCD.split(',')[0]
+                                if anc == B:
+                                    print(chr, pos, anc, dep, 0, anc+anc, sep = '\t', file = f)
+                                else:
+                                    print(chr, pos, anc, dep, 2, BCD+BCD, sep = '\t', file = f)
+                            elif gt == "0/1":
+                                if (anc == A) or (anc == BCD):
+                                    print(chr, pos, anc, dep, 1, "".join(sorted(A+BCD)), sep = '\t',  file = f)
+                                else:
+                                    print(chr, pos, anc, dep, 2, A+BCD, sep = '\t',  file = f)
+                            elif gt == "1/2":  #must be BCD[0]BCD[1]
+                                B = BCD.split(',')
+                                if A == anc:  
+                                    print(chr, pos, anc, dep, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
+                                elif (B[0] == anc) or (B[1] == anc):
+                                    print(chr, pos, anc, dep, 1, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
+                                else:
+                                    print(chr, pos, anc, dep, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
+        else: # assume that vcf is already manifesto filtered:
+            for line in os.popen(s):
+                if not line.startswith("#"):
+                    chr, pos, _, A, BCD, _, _, _, _, info = line.strip().split()    # A, ref
+                    if A != "ACGT" :
+                        pos = int(pos)
+                        anc = fa[pos-1]
+                        if anc in "ACGT":
+                            gt = info.split(':')[0]
+                            if gt == "0/0":    #   homozygous reference, BCD = '.'
+                                if anc == A:
+                                    print(chr, pos, anc, 0, 0, A+A, sep = '\t', file = f)
+                                else:
+                                    print(chr, pos, anc, 0, 2, A+A, sep = '\t', file = f)
+                            elif gt == "1/1":   # homozygous alternative.    anc must be alt
+                                # BCD is a single allele
+                                if anc == BCD:
+                                    print(chr, pos, anc, 0, 0, anc+anc, sep = '\t', file = f)
+                                else:
+                                    print(chr, pos, anc, 0, 2, BCD+BCD, sep = '\t', file = f)
+                            elif gt == "0/1":
+                                if (anc == A) or (anc == BCD):
+                                    print(chr, pos, anc, 0, 1, "".join(sorted(A+BCD)), sep = '\t',  file = f)
+                                else:
+                                    print(chr, pos, anc, 0, 2, A+BCD, sep = '\t',  file = f)
+                            elif gt == "1/2":  #must be BCD[0]BCD[1]
+                                B = BCD.split(',')
+                                if A == anc:
+                                    print(chr, pos, anc, 0, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
+                                elif (B[0] == anc) or (B[1] == anc):
+                                    print(chr, pos, anc, 0, 1, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
+                                else:
+                                    print(chr, pos, anc, 0, 2, "".join(sorted(B[0]+B[1])), sep = '\t', file = f)
+            
 def get_weights(bedfile, window_size, mut_bed): # return weights from the first window to the last window
     first_window = 0
     last_window = 0
@@ -574,6 +613,11 @@ rec = False, rec_bed = None, mut_bed = None):  # return g0 g1
         l1 = sum(obs_count_)
         assert l==l1, f"missing part of mut rates for obs in {chrom} chromsome, {l} mut records, {l1} obs records"
     return obs_chrs, list(gl["g_0"].keys()), list(list(gl["g_0"][chrom].keys()) for chrom in list(gl["g_0"].keys()) ), m_rates
+def sort_chrom(value):
+    try:
+        return (0, int(value))
+    except ValueError:
+        return (1, value)
 
 def load_observations_gt(gt_file, mask_file, window_size, max_variants, data_type, rec_map,
 filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
@@ -585,7 +629,7 @@ filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
     call_index = []    #[0,1,3,5,...]   bins with data
     # assuming full length 100M
     window_all = []
-
+    # observation is always sorted by chr.
     call = get_weights(mask_file, window_size, mut_bed)
     rec = []
     if not rec_map is None:
@@ -594,7 +638,11 @@ filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
         rec_map['bin'] = rec_map['bin'].astype(int)
         rec_map['rate'] = rec_map['rate'] + 1e-8
         #rec_map['rate'] = 0.001  #test constant
-    for chr in list(call.keys()):
+    chr_unsorted = list(call.keys())
+    chr_sorted = sorted(chr_unsorted, key=sort_chrom)
+    chr_total_sort = []
+    for chr in chr_sorted:
+        chr_total_sort.append(chr)
         first_w = list(call[chr].keys())[0]  # the first window callable
         last_w = list(call[chr].keys())[-1]  # the last window callable
         weights_ = np.zeros(last_w - first_w + 1)
@@ -611,6 +659,7 @@ filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
         weights.append(weights_)
         call_index.append(call_index_) #
     snp = defaultdict(lambda:defaultdict(int))
+    print(f"weights loaded for all chrs {chr_total_sort}")
     if gt_file.endswith(".gz"):
         if data_type == "ancient":
             sss = f"zcat {gt_file} | awk '($5 > 0)'"
@@ -667,57 +716,103 @@ filter_depth, minimum_dep, maximum_dep, mut_bed):  # return number of variants
         obs.append(snps)
     return chr_index, weights, obs, call_index, window_all, rec
 
-"""
-I am lazy, so I directly calculate mutation rate either from simulation or from empirical data.
-No functions embedded so far.
-Super-high mutation rates comes from mappability filter. Nominator is too small in some windows.
-"""
-def find_runs(inarray):
-    """ run length encoding. Partial credit to R rle function. 
-        Multi datatype arrays catered for including non Numpy
-        returns: tuple (runlengths, startpositions, values) """
-    ia = np.asarray(inarray)                # force numpy
-    n = len(ia)
-    if n == 0: 
-        return (None, None, None)
-    else:
-        y = ia[1:] != ia[:-1]               # pairwise unequal (string safe)
-        i = np.append(np.where(y), n - 1)   # must include last element posi
-        z = np.diff(np.append(-1, i))       # run lengths
-        p = np.cumsum(np.append(0, z))[:-1] # positions
-
-        for (a, b, c) in zip(ia[i], p, z):
-            yield (a, b, c)
 
 
-def Call(obs, chroms, starts, variants, hmm_parameters):
-    
-    post_seq = (forward_probs * backward_probs).T
 
-    segments = []
-    for (chrom, chrom_start_index, chrom_length_index) in find_runs(chroms):
-        state_with_highest_prob = np.argmax(post_seq[:,chrom_start_index:chrom_start_index + chrom_length_index-1], axis = 0)
-        for (state, start_index, length_index) in find_runs(state_with_highest_prob):
-
-            start_index = start_index + chrom_start_index
-            end_index = start_index + length_index
-
-            genome_start = starts[start_index]
-            genome_end = starts[start_index + length_index - 1]
-            genome_length =  length_index * window_size
-
-            snp_counter = np.sum(obs[start_index:end_index])
-            mean_prob = round(np.mean(post_seq[state, start_index:end_index]), 5)
-            #variants_segment = flatten_list(variants[start_index:end_index])
-
-            
-            # Diploid or haploid
-            if '_hap' in chrom:
-                newchrom, ploidity = chrom.split('_')
+def anno(gt_file, called, vcf, out, samples, window_size = 1000,
+filter_depth = "False", minimum_dep = 0, maximum_dep = 100):  # return number of variants
+    chr = []
+    chr_index = []  #chrs
+    windows = []
+    weights = []  # weights    [1,0,1,0,2,...] from the first bin with data to last bin with data
+    obs = []    # [0,0,0,1,0,0...][0,1,1,0,...] from the first bin with data to last bin with data
+    call_index = []    #[0,1,3,5,...]   bins with data
+    # assuming full length 100M
+    window_all = []
+    snp = defaultdict(lambda:defaultdict(lambda: defaultdict(lambda:defaultdict(str))))
+    #still loading all the snps, and create a temp .pos file for vcf
+    with open(out+"temp", 'w') as f:
+        if gt_file.endswith(".gz"):
+            sss = f"zcat {gt_file} | awk '($5 > 0)'"
+            if filter_depth is True:
+                for line in os.popen(sss):
+                    #chr, pos = line.strip().split()
+                    chr, pos, anc, dep, _, gt = line.strip().split()[0:6]
+                    if (int(dep) <= maximum_dep) and (int(dep) >= minimum_dep):
+                        window = ceil(int(pos) / window_size) - 1
+                        gt = gt.replace(anc, "")
+                        gt = gt[0]
+                        snp[chr][window][pos] = gt
+                        print(f"{chr}\t{pos}\t{gt}", file = f)
             else:
-                ploidity = 'diploid'
-                newchrom = chrom
-
-            segments.append([newchrom, genome_start,  genome_end, genome_length, hmm_parameters.state_names[state], mean_prob, snp_counter, ploidity, variants_segment]) 
-        
-    return segments
+                for line in os.popen(sss):
+                    #chr, pos = line.strip().split()
+                    chr, pos, anc, dep, _, gt = line.strip().split()[0:6]
+                    window = ceil(int(pos) / window_size) - 1
+                    snp[chr][window][pos] = gt
+                    gt = gt.replace(anc, "")
+                    gt = gt[0]
+                    snp[chr][window][pos] = gt
+                    print(f"{chr}\t{pos}\t{gt}", file = f)
+        else:
+            print("not supporting simulations at the moment")
+            return None
+    snp_anno = defaultdict(lambda:defaultdict(lambda: defaultdict(int)))
+    samples_list = ",".join(samples.split(","))
+    samples = samples.split(",")
+    vcfs = vcf.split(",")
+    for vcf_ in vcfs:
+        print(f"Using samples {samples_list}")
+        for line in os.popen(f"bcftools view -R {out+'temp'} -s {samples_list} {vcf_}"):
+            if not line.startswith("#"):
+                chr, pos = line.strip().split()[0:2]
+                window = ceil(int(pos) / window_size) - 1
+                ref = line.strip().split()[3]
+                alt = line.strip().split()[4]
+                for ind, gt in enumerate(line.strip().split()[9:]):  #loop through all archaic individuals
+                    gt = gt.split(':')[0]
+                    if gt == "./.":
+                        continue
+                    if gt == "0/0":
+                        gt = ref+ref
+                    elif gt == "1/1":
+                        gt = alt+alt
+                    elif gt == "0/1":
+                        gt = ref+alt
+                    elif gt == "1/2":
+                        gt = alt.split(",")[0]+alt.split(",")[1]
+                    if (snp[chr][window][pos] == gt[0]) or (snp[chr][window][pos] == gt[1]):
+                        snp_anno[chr][window][samples[ind]+"_match"] +=1
+                    else:
+                        snp_anno[chr][window][samples[ind]+"_mismatch"] +=1
+    with open(called, 'r') as data:
+        S_info = []
+        for sample in samples:
+            S_info.append(sample+"_match")
+            S_info.append(sample+"_total")
+        with open(out, 'w') as f:
+            #print("chr","start", "end", "state", "mean_prob", "length", "\t".join(S_info), sep = '\t', file = f) not used. as we now call by penalty
+            print("chr","start", "end", "length", "map_len", "\t".join(S_info), "source1", "source2", sep = '\t', file = f)
+            for line in data:
+                if not line.startswith("chr"):
+                    chr, start, end, _ = line.strip().split()
+                    start = int(int(start) / window_size)
+                    end = int(int(end) / window_size)
+                    if state == "Archaic" :
+                        M = []       
+                        for sample in samples:
+                            m = 0
+                            mism = 0               
+                            for window in list(snp_anno[chr].keys()):
+                                if (window >= start) and (window <= end):
+                                    m += snp_anno[chr][window][sample+"_match"]
+                                    mism += snp_anno[chr][window][sample+"_mismatch"]
+                            t = m+mism
+                            if (t) == 0:
+                                M.append("0")
+                            else:
+                                r = round(m/t,4)
+                                M.append(f"{r}")
+                            M.append(f"{t}")
+                        #print(chr,start,end,state, prob, len_, "\t".join(M), sep = '\t') 
+                        #print(chr,start,end,state, len_, "\t".join(M), sep = '\t', file = f)                   

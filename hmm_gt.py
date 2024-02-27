@@ -167,7 +167,8 @@ def backward(emissions, transitions, scales):
     return beta
 
 
-def TrainModel_GT(hmm_parameters, weights, obs, chr_index, call_index, post_file, log_file, rec, w, maxiterations = 1000, epsilon = 0.0001, window_size = 1000,):  # w window index
+def TrainModel_GT(hmm_parameters, weights, obs, chr_index, call_index, post_file, log_file, rec, w,  not_est_starting_prob,
+                  not_est_trans = False, maxiterations = 1000, epsilon = 0.0001, window_size = 1000,):  # w window index
     """
     Trains the model once, using the forward-backward algorithm. 
     chr_index, weights, obs, call_index, w
@@ -218,7 +219,10 @@ def TrainModel_GT(hmm_parameters, weights, obs, chr_index, call_index, post_file
         else:
             new_trans = hmm_parameters.transitions # do not change
         normalize = np.sum(normalize, axis = 0)
-        new_starting_probabilities = normalize/np.sum(normalize, axis=0) 
+        if not not_est_starting_prob:
+            new_starting_probabilities = normalize/np.sum(normalize, axis=0) 
+        else:
+            new_starting_probabilities = hmm_parameters.starting_probabilities
         hmm_parameters = HMMParam(
             hmm_parameters.state_names,
             new_starting_probabilities,

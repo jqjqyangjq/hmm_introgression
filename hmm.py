@@ -260,7 +260,7 @@ def update_post_geno(PG, SNP, Z, SNP2BIN, chr):
     assert np.allclose(np.sum(PG, (1, 2)), 1, atol=1e-6), f"sum of PG is not 1 for chr index {chr}. Consider numeric overflow as the bin size might be too large"
     return PG
 
-def TrainModel(raw_obs, chr_index, w, pars, post_file, not_est_trans, m_rates,
+def TrainModel(raw_obs, chr_index, w, pars, post_file, not_est_trans, m_rates,not_est_starting_prob,
                epsilon=5e-4, maxiterations=1000, log_file = None):
 
     print(f"Fix transition parameter(in case low coverage): {not_est_trans}")
@@ -369,7 +369,10 @@ def TrainModel(raw_obs, chr_index, w, pars, post_file, not_est_trans, m_rates,
 
 
         normalize = np.sum(normalize, axis = 0)
-        new_starting_probabilities = normalize/np.sum(normalize, axis=0) 
+        if not not_est_starting_prob:
+            new_starting_probabilities = normalize/np.sum(normalize, axis=0) 
+        else:
+            new_starting_probabilities = pars.starting_probabilities
         pars = HMMParam(
             pars.state_names,
             new_starting_probabilities,
