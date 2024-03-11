@@ -86,7 +86,6 @@ filter_depth = "False", minimum_dep = 0, maximum_dep = 100):  # return number of
     S_info = []
     for sample in samples:
         S_info.append(sample+"_match")
-        S_info.append(sample+"_total")
     print("loading vcfs for comparision done")
     with open(out, 'w') as f:
         if not map_file is None:
@@ -100,7 +99,6 @@ filter_depth = "False", minimum_dep = 0, maximum_dep = 100):  # return number of
                 row = next(loop_map)[1]
                 row_1 = next(loop_map)[1]
                 for i in range(len(call_chr)):
-                    print(i)
                     if row.pos > call_chr.start[i]*window_size:  # start of the called frag is before the first rec pos. so is 0
                         start_gen = row.map_len
                         if (call_chr.end[i]*window_size+window_size) < row.pos:  #end of the called frag is before the first rec pos

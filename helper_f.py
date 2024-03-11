@@ -270,6 +270,7 @@ def get_weights(bedfile, window_size, mut_bed): # return weights from the first 
             # No mut file is provided
             return weights
         else:
+            print(f"loading mut file {mut_bed}")
             mut = pd.read_csv(mut_bed, names = ['chr', 'start', 'end', 'rate'], dtype = {'chr':str, 'start':int, 'end':int, 'rate':float}, sep='\s+') 
             for chr in list(weights.keys()):
                 mut_chr = mut[mut['chr'] == chr].reset_index(drop = True)

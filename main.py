@@ -333,3 +333,11 @@ def main():
              maximum_dep = args.maximum_dep)
 if __name__ == "__main__":
     main()
+"""
+hmm_parameters = read_HMM_parameters_from_file(None)
+chr_index, weights, obs, call_index, w, rec = load_observations_gt("/mnt/diversity/jiaqi/Den_Anc/Han/NA18552_file/NA18552.chrAuto.obs.gz", 
+"/mnt/diversity/jiaqi/hmm/mask_new/1kg_accessibility_map35_100_simpleRepeat.rm_1kg_sgdp_outgroup.bed", 
+1000, 50, "Modern", None, False, 0, 100, 
+"/mnt/diversity/jiaqi/Den_Anc/1kg_hgdp_outgroup/hmmix_mut_rate_1kg_1M_chrAll_safe")
+print("done")
+"""
